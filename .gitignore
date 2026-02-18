@@ -61,6 +61,7 @@ web_modules/
 
 # Output of 'npm pack'
 *.tgz
+*.vsix
 
 # Yarn Integrity file
 .yarn-integrity
@@ -81,6 +82,10 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+
+# Generated JS artifacts in TS source tree
+src/**/*.js
+src/**/*.js.map
 
 # Gatsby files
 .cache/
