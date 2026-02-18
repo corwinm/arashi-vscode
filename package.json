@@ -135,9 +135,9 @@
     }
   },
   "scripts": {
-    "build": "bun build src/extension.ts --outfile dist/extension.js --format cjs --target node --external vscode --sourcemap",
+    "build": "bun build src/extension.ts --outdir=dist --format=cjs --target=node --external=vscode --sourcemap",
     "watch": "bun run watch:build",
-    "watch:build": "bun build src/extension.ts --outfile dist/extension.js --format cjs --target node --external vscode --sourcemap --watch",
+    "watch:build": "bun build src/extension.ts --outdir=dist --format=cjs --target=node --external=vscode --sourcemap --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
