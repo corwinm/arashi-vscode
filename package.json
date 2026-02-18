@@ -1,0 +1,160 @@
+{
+  "name": "arashi-vscode",
+  "displayName": "Arashi",
+  "description": "Run Arashi workflows and manage worktrees from VS Code and Cursor.",
+  "version": "0.1.0",
+  "publisher": "haphazarddev",
+  "license": "MIT",
+  "repository": "https://github.com/corwinm/arashi-vscode",
+  "homepage": "https://arashi.haphazard.dev",
+  "bugs": {
+    "url": "https://github.com/corwinm/arashi-vscode/issues"
+  },
+  "engines": {
+    "vscode": "^1.96.2"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "arashi",
+    "git",
+    "worktree",
+    "cursor",
+    "vscode"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:arashi.init",
+    "onCommand:arashi.add",
+    "onCommand:arashi.create",
+    "onCommand:arashi.switch",
+    "onCommand:arashi.remove",
+    "onCommand:arashi.worktrees.refresh",
+    "onCommand:arashi.worktrees.switch",
+    "onCommand:arashi.worktrees.remove",
+    "onCommand:arashi.worktrees.addRepo",
+    "onView:arashi.worktrees"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "arashi.init",
+        "title": "Arashi: Init Workspace"
+      },
+      {
+        "command": "arashi.add",
+        "title": "Arashi: Add Repository"
+      },
+      {
+        "command": "arashi.create",
+        "title": "Arashi: Create Worktree"
+      },
+      {
+        "command": "arashi.switch",
+        "title": "Arashi: Switch Worktree"
+      },
+      {
+        "command": "arashi.remove",
+        "title": "Arashi: Remove Worktree"
+      },
+      {
+        "command": "arashi.worktrees.refresh",
+        "title": "Refresh Arashi Worktrees",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "arashi.worktrees.switch",
+        "title": "Switch Worktree",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "arashi.worktrees.remove",
+        "title": "Remove Worktree",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "arashi.worktrees.addRepo",
+        "title": "Add Repository",
+        "icon": "$(repo-create)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "arashi.worktrees",
+          "name": "Arashi Worktrees"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "arashi.worktrees.addRepo",
+          "when": "view == arashi.worktrees",
+          "group": "navigation@1"
+        },
+        {
+          "command": "arashi.worktrees.refresh",
+          "when": "view == arashi.worktrees",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "arashi.worktrees.switch",
+          "when": "view == arashi.worktrees && viewItem == arashi.worktree",
+          "group": "inline@1"
+        },
+        {
+          "command": "arashi.worktrees.remove",
+          "when": "view == arashi.worktrees && viewItem == arashi.worktree",
+          "group": "inline@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Arashi",
+      "properties": {
+        "arashi.binaryPath": {
+          "type": "string",
+          "default": "arashi",
+          "description": "Path to the Arashi CLI binary used by this extension."
+        },
+        "arashi.workspaceRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Workspace root where Arashi commands run. Leave empty to use the current workspace folder."
+        },
+        "arashi.commandTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 1000,
+          "description": "Timeout in milliseconds for each Arashi command invocation."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "bun build src/extension.ts --outfile dist/extension.js --format cjs --target node --external vscode --sourcemap",
+    "watch": "bun run watch:build",
+    "watch:build": "bun build src/extension.ts --outfile dist/extension.js --format cjs --target node --external vscode --sourcemap --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "bun test",
+    "vscode:prepublish": "bun run build",
+    "verify:release": "bun run scripts/verify-release-metadata.ts",
+    "package": "bunx @vscode/vsce package",
+    "publish:vsce": "bunx @vscode/vsce publish",
+    "publish:ovsx": "bunx ovsx publish"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.6.0",
+    "bun-types": "latest",
+    "ovsx": "^0.10.5",
+    "typescript": "^5.9.3"
+  }
+}

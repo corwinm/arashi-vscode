@@ -1,0 +1,70 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "watch",
+      "dependsOn": ["arashi-vscode: watch:tsc", "arashi-vscode: watch:build"],
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "arashi-vscode: watch:build",
+      "type": "shell",
+      "command": "bun run watch:build",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "owner": "custom",
+          "pattern": [
+            {
+              "regexp": "^__NO_PROBLEMS__:(.*)$",
+              "file": 1,
+              "message": 1
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "^(\\$ bun run watch:build|\\$ bun build)",
+            "endsPattern": "^Bundled .*"
+          }
+        }
+      ],
+      "presentation": {
+        "group": "watch",
+        "reveal": "never"
+      }
+    },
+    {
+      "label": "arashi-vscode: watch:tsc",
+      "type": "shell",
+      "command": "bun run watch:tsc",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "presentation": {
+        "group": "watch",
+        "reveal": "never"
+      }
+    },
+    {
+      "label": "arashi-vscode: build",
+      "type": "shell",
+      "command": "bun run build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "arashi-vscode: test",
+      "type": "shell",
+      "command": "bun run test",
+      "group": "test"
+    }
+  ]
+}
