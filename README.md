@@ -51,3 +51,12 @@ Open `repos/arashi-vscode` as the active workspace folder before launching debug
 3. For a hot-reload loop, use `Run Extension (Watch)` which runs `watch:tsc` and `watch:build` in parallel
 
 The launch configurations mirror the oil.code workflow structure (extension-host launch plus watch mode), and sourcemaps are enabled for source-level debugging.
+
+## CI and Release
+
+- Pull requests run lint, tests, and build via `.github/workflows/ci.yml`.
+- Releases run via manual GitHub Actions dispatch (`Release` workflow).
+- The release workflow uses `semantic-release` to:
+  - generate release notes and update `CHANGELOG.md`
+  - bump `package.json` version and commit both files back to the repository
+  - build/package the extension and publish the same release artifact to VS Marketplace and Open VSX

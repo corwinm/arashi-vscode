@@ -145,16 +145,26 @@
     "test": "bun test",
     "vscode:prepublish": "bun run build",
     "verify:release": "bun run scripts/verify-release-metadata.ts",
+    "release": "semantic-release",
     "package": "bunx @vscode/vsce package",
     "publish:vsce": "bunx @vscode/vsce publish",
     "publish:ovsx": "bunx ovsx publish"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.6",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/node": "^22.13.1",
     "@types/vscode": "^1.96.0",
     "@vscode/vsce": "^3.6.0",
     "bun-types": "latest",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
     "ovsx": "^0.10.5",
+    "semantic-release": "^24.2.0",
     "typescript": "^5.9.3"
   }
 }
