@@ -1,6 +1,6 @@
 # Arashi VS Code Extension
 
-Manage Arashi worktrees directly from VS Code-compatible editors.
+Manage Arashi worktrees directly from VS Code.
 
 ## Features
 
@@ -11,7 +11,7 @@ Manage Arashi worktrees directly from VS Code-compatible editors.
 
 ## Requirements
 
-- VS Code-compatible editor with extension API support for `^1.96.2`
+- VS Code with extension API support for `^1.96.2`
 - `arashi` CLI available on your system `PATH` (or configured with `arashi.binaryPath`)
 
 ## Configuration
@@ -30,7 +30,7 @@ Manage Arashi worktrees directly from VS Code-compatible editors.
 
 ### Open VSX
 
-1. Open Extensions in Cursor or another VS Code fork
+1. Open Extensions in VS Code
 2. Search Open VSX for `Arashi`
 3. Install and update from your editor's extension manager
 
@@ -39,7 +39,7 @@ Both marketplace releases are built from the same tagged artifact so version num
 ## Compatibility
 
 - Officially targets `engines.vscode: ^1.96.2`
-- Uses stable VS Code APIs to preserve compatibility with VS Code forks such as Cursor
+- Uses stable VS Code APIs to preserve compatibility with VS Code forks
 - If your editor supports standard VS Code extensions at that engine range, behavior should match documented command and panel flows
 
 ## Development
