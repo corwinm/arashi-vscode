@@ -83,6 +83,10 @@ out
 .nuxt
 dist
 
+# Generated JS artifacts in TS source tree
+src/**/*.js
+src/**/*.js.map
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
