@@ -2,7 +2,7 @@
   "name": "arashi-vscode",
   "displayName": "Arashi",
   "description": "Run Arashi workflows and manage worktrees from VS Code.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "haphazarddev",
   "license": "MIT",
   "repository": "https://github.com/corwinm/arashi-vscode",
