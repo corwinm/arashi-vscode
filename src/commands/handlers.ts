@@ -1,3 +1,5 @@
+import { readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
   createCommandInvocation,
   normalizeCommandFailure,
@@ -12,6 +14,7 @@ import { logCommandInvocation, logCommandResult, logDiagnostic, type OutputSink 
 import type { ArashiWorktree, WorktreeRefreshResult } from "../worktrees/types";
 import {
   buildAddArgs,
+  buildCloneArgs,
   buildCreateArgs,
   buildInitArgs,
   buildRemoveArgs,
@@ -64,6 +67,7 @@ export interface CommandHandlerDependencies {
     getWorktrees(): ArashiWorktree[];
     refresh(config: ResolvedExtensionConfig): Promise<WorktreeRefreshResult>;
   };
+  discoverMissingRepositories?: MissingRepositoryDiscovery;
 }
 
 interface AddCommandJson {
@@ -75,6 +79,14 @@ interface AddCommandJson {
     message?: string;
   };
 }
+
+interface MissingRepository {
+  name: string;
+  path: string;
+  gitUrl?: string;
+}
+
+type MissingRepositoryDiscovery = (workspaceRoot: string) => Promise<MissingRepository[]>;
 
 function isWorktree(value: unknown): value is ArashiWorktree {
   return Boolean(
@@ -90,6 +102,9 @@ async function safeNotify(task: PromiseLike<void> | void): Promise<void> {
 }
 
 export function createCommandHandlers(deps: CommandHandlerDependencies): HandlerMap {
+  const discoverMissingRepositories =
+    deps.discoverMissingRepositories ?? defaultDiscoverMissingRepositories;
+
   const executeWithLogging = async (
     command: string,
     args: string[],
@@ -103,6 +118,25 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       cwd: config.workspaceRoot,
       timeoutMs: config.commandTimeoutMs,
       enforceJson: options.enforceJson,
+    });
+    logCommandInvocation(deps.output, invocation);
+    const result = await deps.execute(invocation);
+    logCommandResult(deps.output, result);
+    return result;
+  };
+
+  const executeBinaryWithLogging = async (
+    binaryPath: string,
+    command: string,
+    args: string[],
+  ): Promise<CommandResult> => {
+    const config = deps.getConfig();
+    const invocation = createCommandInvocation({
+      binaryPath,
+      command,
+      args,
+      cwd: config.workspaceRoot,
+      timeoutMs: config.commandTimeoutMs,
     });
     logCommandInvocation(deps.output, invocation);
     const result = await deps.execute(invocation);
@@ -222,6 +256,95 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     }
   };
 
+  const runCloneFlow = async (refreshAfterSuccess: boolean): Promise<void> => {
+    const config = deps.getConfig();
+    const missingRepositories = await discoverMissingRepositories(config.workspaceRoot);
+
+    if (missingRepositories.length === 0) {
+      await safeNotify(deps.notifications.info("No missing repositories found to clone."));
+      return;
+    }
+
+    const mode = await deps.notifications.pick(
+      [
+        {
+          label: "Clone all missing repositories",
+          description: `${missingRepositories.length} repositories`,
+          value: "all" as const,
+        },
+        {
+          label: "Clone one missing repository",
+          description: "Select a single repository to clone",
+          value: "single" as const,
+        },
+      ],
+      {
+        title: "Arashi Clone",
+        placeHolder: "Choose clone mode",
+      },
+    );
+
+    if (!mode) {
+      await safeNotify(deps.notifications.info("Clone cancelled."));
+      return;
+    }
+
+    if (mode.value === "all") {
+      const result = await executeWithLogging("clone", buildCloneArgs({ all: true }));
+      if (!result.ok) {
+        await handleFailure("Clone repositories", result);
+        return;
+      }
+
+      await safeNotify(deps.notifications.success("Cloned all missing repositories."));
+      if (refreshAfterSuccess) {
+        await refreshPanelState();
+      }
+      return;
+    }
+
+    const selectedRepository = await deps.notifications.pick(
+      missingRepositories.map((repository) => ({
+        label: repository.name,
+        description: repository.gitUrl ? "Missing from workspace" : "Missing git URL in config",
+        detail: repository.path,
+        value: repository,
+      })),
+      {
+        title: "Arashi Clone",
+        placeHolder: "Select missing repository to clone",
+      },
+    );
+
+    if (!selectedRepository) {
+      await safeNotify(deps.notifications.info("Clone cancelled."));
+      return;
+    }
+
+    if (!selectedRepository.value.gitUrl) {
+      await safeNotify(
+        deps.notifications.warn(
+          `Cannot clone ${selectedRepository.value.name}: missing git_url in .arashi/config.json.`,
+        ),
+      );
+      return;
+    }
+
+    const result = await executeBinaryWithLogging("git", "clone", [
+      selectedRepository.value.gitUrl,
+      selectedRepository.value.path,
+    ]);
+    if (!result.ok) {
+      await handleFailure(`Clone repository ${selectedRepository.value.name}`, result);
+      return;
+    }
+
+    await safeNotify(deps.notifications.success(`Cloned ${selectedRepository.value.name}.`));
+    if (refreshAfterSuccess) {
+      await refreshPanelState();
+    }
+  };
+
   const runCommandWithFeedback = async (
     input: {
       command: string;
@@ -291,6 +414,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
 
     [COMMAND_IDS.add]: async () => {
       await runAddFlow(true);
+    },
+
+    [COMMAND_IDS.clone]: async () => {
+      await runCloneFlow(true);
     },
 
     [COMMAND_IDS.create]: async () => {
@@ -434,4 +561,77 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       await runAddFlow(true);
     },
   };
+}
+
+async function defaultDiscoverMissingRepositories(
+  workspaceRoot: string,
+): Promise<MissingRepository[]> {
+  const configPath = resolve(workspaceRoot, ".arashi", "config.json");
+  const configExists = await pathExists(configPath);
+  if (!configExists) {
+    return [];
+  }
+
+  let rawConfig: string;
+  try {
+    rawConfig = await readFile(configPath, "utf8");
+  } catch {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawConfig);
+  } catch {
+    return [];
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return [];
+  }
+
+  const discovered = (parsed as { discovered_repos?: unknown }).discovered_repos;
+  if (!discovered || typeof discovered !== "object") {
+    return [];
+  }
+
+  const missing: MissingRepository[] = [];
+
+  for (const [name, repoConfig] of Object.entries(discovered)) {
+    if (!repoConfig || typeof repoConfig !== "object") {
+      continue;
+    }
+
+    const candidate = repoConfig as { path?: unknown; git_url?: unknown };
+    if (typeof candidate.path !== "string" || candidate.path.trim().length === 0) {
+      continue;
+    }
+
+    const absolutePath = resolve(workspaceRoot, candidate.path);
+    const repositoryExists = await pathExists(absolutePath);
+    if (repositoryExists) {
+      continue;
+    }
+
+    missing.push({
+      name,
+      path: absolutePath,
+      gitUrl:
+        typeof candidate.git_url === "string" && candidate.git_url.trim().length > 0
+          ? candidate.git_url.trim()
+          : undefined,
+    });
+  }
+
+  missing.sort((a, b) => a.name.localeCompare(b.name));
+  return missing;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

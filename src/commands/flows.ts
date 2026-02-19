@@ -40,6 +40,14 @@ export function buildAddArgs(input: { gitUrl: string; name?: string }): string[]
   return args;
 }
 
+export function buildCloneArgs(input: { all?: boolean } = {}): string[] {
+  const args: string[] = [];
+  if (input.all) {
+    args.push("--all");
+  }
+  return args;
+}
+
 export function buildCreateArgs(branch: string): string[] {
   return [branch.trim()];
 }

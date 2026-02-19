@@ -27,6 +27,7 @@
   "activationEvents": [
     "onCommand:arashi.init",
     "onCommand:arashi.add",
+    "onCommand:arashi.clone",
     "onCommand:arashi.create",
     "onCommand:arashi.pull",
     "onCommand:arashi.sync",
@@ -47,6 +48,10 @@
       {
         "command": "arashi.add",
         "title": "Arashi: Add Repository"
+      },
+      {
+        "command": "arashi.clone",
+        "title": "Arashi: Clone Repositories"
       },
       {
         "command": "arashi.create",
