@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildCloneArgs,
   buildInitArgs,
   buildRemoveArgs,
   resolveRequiredPromptValue,
@@ -29,5 +30,9 @@ describe("command flow helpers", () => {
       "/tmp/worktree",
       "--path",
     ]);
+  });
+
+  test("builds clone arguments for all mode", () => {
+    expect(buildCloneArgs({ all: true })).toEqual(["--all"]);
   });
 });

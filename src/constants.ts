@@ -5,6 +5,7 @@ export const OUTPUT_CHANNEL_NAME = "Arashi";
 export const COMMAND_IDS = {
   init: "arashi.init",
   add: "arashi.add",
+  clone: "arashi.clone",
   create: "arashi.create",
   pull: "arashi.pull",
   sync: "arashi.sync",
