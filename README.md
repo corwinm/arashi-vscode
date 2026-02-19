@@ -4,7 +4,7 @@ Manage Arashi worktrees directly from VS Code.
 
 ## Features
 
-- Run core Arashi commands from the command palette: `init`, `add`, `create`, `switch`, `remove`
+- Run core Arashi commands from the command palette: `init`, `add`, `create`, `pull`, `sync`, `switch`, `remove`
 - Browse worktrees in the **Arashi Worktrees** panel with repo, branch, path, and change status
 - Trigger contextual panel actions for switch, remove, and add repository
 - Capture command context and diagnostics in the **Arashi** output channel
@@ -13,6 +13,7 @@ Manage Arashi worktrees directly from VS Code.
 
 - VS Code with extension API support for `^1.96.2`
 - `arashi` CLI available on your system `PATH` (or configured with `arashi.binaryPath`)
+- Install or upgrade the CLI using the docs site: <https://arashi.haphazard.dev/getting-started/>
 
 ## Configuration
 
@@ -21,6 +22,9 @@ Manage Arashi worktrees directly from VS Code.
 - `arashi.commandTimeoutMs`: Per-command timeout in milliseconds (default: `120000`)
 
 ## Install and Upgrade
+
+For Arashi CLI installation steps, use the canonical docs guide at <https://arashi.haphazard.dev/getting-started/>.
+This README keeps extension-specific install and upgrade information only.
 
 ### VS Marketplace
 

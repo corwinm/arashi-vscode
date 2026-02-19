@@ -6,6 +6,8 @@ export const COMMAND_IDS = {
   init: "arashi.init",
   add: "arashi.add",
   create: "arashi.create",
+  pull: "arashi.pull",
+  sync: "arashi.sync",
   switch: "arashi.switch",
   remove: "arashi.remove",
   panelRefresh: "arashi.worktrees.refresh",
