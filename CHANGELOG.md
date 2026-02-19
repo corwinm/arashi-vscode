@@ -1,3 +1,10 @@
+## [1.1.0](https://github.com/corwinm/arashi-vscode/compare/v1.0.0...v1.1.0) (2026-02-19)
+
+### Features
+
+* add pull and sync VS Code extension commands ([#2](https://github.com/corwinm/arashi-vscode/issues/2)) ([bfab12c](https://github.com/corwinm/arashi-vscode/commit/bfab12cb5c1d8d2b671b089020bb700c2055653b))
+* Clone command ([#3](https://github.com/corwinm/arashi-vscode/issues/3)) ([b008428](https://github.com/corwinm/arashi-vscode/commit/b008428a9ebbc8ac8824f5486a599b315552a954))
+
 ## 1.0.0 (2026-02-18)
 
 ### Features
