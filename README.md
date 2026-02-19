@@ -8,6 +8,7 @@ Manage Arashi worktrees directly from VS Code.
 - Browse worktrees in the **Arashi Worktrees** panel with repo, branch, path, and change status
 - Trigger contextual panel actions for switch, remove, and add repository
 - Capture command context and diagnostics in the **Arashi** output channel
+- Use `arashi clone` from the integrated terminal to recover missing configured repositories
 
 ## Requirements
 
