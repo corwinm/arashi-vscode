@@ -222,6 +222,27 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     }
   };
 
+  const runCommandWithFeedback = async (
+    input: {
+      command: string;
+      args?: string[];
+      actionLabel: string;
+      successMessage: string;
+      refreshAfterSuccess?: boolean;
+    },
+  ): Promise<void> => {
+    const result = await executeWithLogging(input.command, input.args ?? []);
+    if (!result.ok) {
+      await handleFailure(input.actionLabel, result);
+      return;
+    }
+
+    await safeNotify(deps.notifications.success(input.successMessage));
+    if (input.refreshAfterSuccess) {
+      await refreshPanelState();
+    }
+  };
+
   return {
     [COMMAND_IDS.init]: async () => {
       const reposDir = await deps.notifications.input({
@@ -292,6 +313,24 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
 
       await safeNotify(deps.notifications.success("Worktree created."));
       await refreshPanelState();
+    },
+
+    [COMMAND_IDS.pull]: async () => {
+      await runCommandWithFeedback({
+        command: "pull",
+        actionLabel: "Pull worktrees",
+        successMessage: "Pulled worktrees.",
+        refreshAfterSuccess: true,
+      });
+    },
+
+    [COMMAND_IDS.sync]: async () => {
+      await runCommandWithFeedback({
+        command: "sync",
+        actionLabel: "Sync worktrees",
+        successMessage: "Synced worktrees.",
+        refreshAfterSuccess: true,
+      });
     },
 
     [COMMAND_IDS.switch]: async () => {

@@ -10,6 +10,7 @@
   "bugs": {
     "url": "https://github.com/corwinm/arashi-vscode/issues"
   },
+  "icon": "images/arashi-logo.png",
   "engines": {
     "vscode": "^1.96.2"
   },
@@ -27,6 +28,8 @@
     "onCommand:arashi.init",
     "onCommand:arashi.add",
     "onCommand:arashi.create",
+    "onCommand:arashi.pull",
+    "onCommand:arashi.sync",
     "onCommand:arashi.switch",
     "onCommand:arashi.remove",
     "onCommand:arashi.worktrees.refresh",
@@ -48,6 +51,14 @@
       {
         "command": "arashi.create",
         "title": "Arashi: Create Worktree"
+      },
+      {
+        "command": "arashi.pull",
+        "title": "Arashi: Pull"
+      },
+      {
+        "command": "arashi.sync",
+        "title": "Arashi: Sync"
       },
       {
         "command": "arashi.switch",
