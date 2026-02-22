@@ -324,7 +324,7 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     if (!selectedRepository.value.gitUrl) {
       await safeNotify(
         deps.notifications.warn(
-          `Cannot clone ${selectedRepository.value.name}: missing git_url in .arashi/config.json.`,
+          `Cannot clone ${selectedRepository.value.name}: missing gitUrl in .arashi/config.json.`,
         ),
       );
       return;
@@ -590,19 +590,27 @@ async function defaultDiscoverMissingRepositories(
     return [];
   }
 
-  const discovered = (parsed as { discovered_repos?: unknown }).discovered_repos;
-  if (!discovered || typeof discovered !== "object") {
+  const parsedConfig = parsed as {
+    repos?: unknown;
+    discovered_repos?: unknown;
+  };
+  const configuredRepos = parsedConfig.repos ?? parsedConfig.discovered_repos;
+  if (!configuredRepos || typeof configuredRepos !== "object") {
     return [];
   }
 
   const missing: MissingRepository[] = [];
 
-  for (const [name, repoConfig] of Object.entries(discovered)) {
+  for (const [name, repoConfig] of Object.entries(configuredRepos)) {
     if (!repoConfig || typeof repoConfig !== "object") {
       continue;
     }
 
-    const candidate = repoConfig as { path?: unknown; git_url?: unknown };
+    const candidate = repoConfig as {
+      path?: unknown;
+      gitUrl?: unknown;
+      git_url?: unknown;
+    };
     if (typeof candidate.path !== "string" || candidate.path.trim().length === 0) {
       continue;
     }
@@ -617,8 +625,10 @@ async function defaultDiscoverMissingRepositories(
       name,
       path: absolutePath,
       gitUrl:
-        typeof candidate.git_url === "string" && candidate.git_url.trim().length > 0
-          ? candidate.git_url.trim()
+        typeof candidate.gitUrl === "string" && candidate.gitUrl.trim().length > 0
+          ? candidate.gitUrl.trim()
+          : typeof candidate.git_url === "string" && candidate.git_url.trim().length > 0
+            ? candidate.git_url.trim()
           : undefined,
     });
   }
