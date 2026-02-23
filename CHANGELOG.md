@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/corwinm/arashi-vscode/compare/v1.1.0...v1.1.1) (2026-02-23)
+
+### Bug Fixes
+
+* **clone:** support canonical config keys in VS Code ([#4](https://github.com/corwinm/arashi-vscode/issues/4)) ([59016de](https://github.com/corwinm/arashi-vscode/commit/59016debdde77d6240955b56d1752f146010aee9))
+
 ## [1.1.0](https://github.com/corwinm/arashi-vscode/compare/v1.0.0...v1.1.0) (2026-02-19)
 
 ### Features
