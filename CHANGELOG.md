@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/corwinm/arashi-vscode/compare/v1.1.1...v1.2.0) (2026-03-30)
+
+### Features
+
+* align switch flows with editor hosts ([#5](https://github.com/corwinm/arashi-vscode/issues/5)) ([1791bfd](https://github.com/corwinm/arashi-vscode/commit/1791bfd57dc705548d90dfd338504f7cfbabe2e3))
+
 ## [1.1.1](https://github.com/corwinm/arashi-vscode/compare/v1.1.0...v1.1.1) (2026-02-23)
 
 ### Bug Fixes
