@@ -3,6 +3,7 @@ import {
   buildCloneArgs,
   buildInitArgs,
   buildRemoveArgs,
+  buildSwitchArgs,
   resolveRequiredPromptValue,
 } from "../../src/commands/flows";
 
@@ -34,5 +35,9 @@ describe("command flow helpers", () => {
 
   test("builds clone arguments for all mode", () => {
     expect(buildCloneArgs({ all: true })).toEqual(["--all"]);
+  });
+
+  test("builds switch arguments with the detected editor host", () => {
+    expect(buildSwitchArgs("/tmp/worktree", "cursor")).toEqual(["/tmp/worktree", "--cursor"]);
   });
 });

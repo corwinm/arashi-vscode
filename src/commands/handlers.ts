@@ -466,7 +466,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const result = await executeWithLogging("switch", buildSwitchArgs(selected.path));
+      const result = await executeWithLogging(
+        "switch",
+        buildSwitchArgs(selected.path, deps.getConfig().editorHost),
+      );
       if (!result.ok) {
         await handleFailure("Switch worktree", result);
         return;
@@ -517,7 +520,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const result = await executeWithLogging("switch", buildSwitchArgs(selected.path));
+      const result = await executeWithLogging(
+        "switch",
+        buildSwitchArgs(selected.path, deps.getConfig().editorHost),
+      );
       if (!result.ok) {
         await handleFailure("Switch worktree", result);
         return;

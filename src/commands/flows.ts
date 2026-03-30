@@ -1,3 +1,5 @@
+import type { EditorHost } from "../config";
+
 export interface PromptValueResult {
   cancelled: boolean;
   value?: string;
@@ -52,8 +54,13 @@ export function buildCreateArgs(branch: string): string[] {
   return [branch.trim()];
 }
 
-export function buildSwitchArgs(target: string): string[] {
-  return [target.trim()];
+export function buildSwitchArgs(target: string, editorHost: EditorHost = null): string[] {
+  const args = [target.trim()];
+  const hostFlag = resolveSwitchHostFlag(editorHost);
+  if (hostFlag) {
+    args.push(hostFlag);
+  }
+  return args;
 }
 
 export function buildRemoveArgs(input: { target: string; pathMode: boolean }): string[] {
@@ -62,4 +69,20 @@ export function buildRemoveArgs(input: { target: string; pathMode: boolean }): s
     args.push("--path");
   }
   return args;
+}
+
+function resolveSwitchHostFlag(editorHost: EditorHost): string | undefined {
+  if (editorHost === "vscode") {
+    return "--vscode";
+  }
+
+  if (editorHost === "cursor") {
+    return "--cursor";
+  }
+
+  if (editorHost === "kiro") {
+    return "--kiro";
+  }
+
+  return undefined;
 }

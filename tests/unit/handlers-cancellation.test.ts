@@ -12,6 +12,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
+        editorHost: null,
       }),
       execute: async (request) => {
         executedCommands.push(request.command);
@@ -64,6 +65,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
+        editorHost: null,
       }),
       execute: async (request) => {
         executedCommands.push(request.command);
@@ -117,6 +119,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
+        editorHost: null,
       }),
       execute: async () => ({
         ok: false,
@@ -171,6 +174,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
+        editorHost: null,
       }),
       execute: async (request) => {
         executedRequests.push({
@@ -250,6 +254,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
+        editorHost: null,
       }),
       execute: async (request) => {
         executedRequests.push({

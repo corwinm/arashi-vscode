@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { access, readFile, readdir, stat } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { normalizeCommandFailure, type CommandExecutor, type CommandFailure } from "./cli/runner";
 
 export interface WorkspaceFolderLike {
@@ -16,6 +16,14 @@ export interface ResolvedExtensionConfig {
   binaryPath: string;
   workspaceRoot: string;
   commandTimeoutMs: number;
+  editorHost: EditorHost;
+}
+
+export type EditorHost = "vscode" | "cursor" | "kiro" | null;
+
+export interface EditorHostContext {
+  appName?: string;
+  uriScheme?: string;
 }
 
 export interface StartupValidationResult {
@@ -24,9 +32,12 @@ export interface StartupValidationResult {
   warnings: string[];
 }
 
+const ROOT_PATH = "/";
+
 export function resolveExtensionConfig(
   settings: SettingsReader,
   workspaceFolders: readonly WorkspaceFolderLike[] | undefined,
+  hostContext: EditorHostContext = {},
 ): ResolvedExtensionConfig {
   const binaryPath = settings.get<string>("binaryPath", "arashi").trim() || "arashi";
   const timeoutRaw = settings.get<number>("commandTimeoutMs", 120000);
@@ -44,7 +55,27 @@ export function resolveExtensionConfig(
     binaryPath,
     workspaceRoot,
     commandTimeoutMs,
+    editorHost: resolveEditorHost(hostContext),
   };
+}
+
+export function resolveEditorHost(hostContext: EditorHostContext = {}): EditorHost {
+  const uriScheme = hostContext.uriScheme?.trim().toLowerCase() ?? "";
+  const appName = hostContext.appName?.trim().toLowerCase() ?? "";
+
+  if (uriScheme.includes("cursor") || appName.includes("cursor")) {
+    return "cursor";
+  }
+
+  if (uriScheme.includes("kiro") || appName.includes("kiro")) {
+    return "kiro";
+  }
+
+  if (uriScheme.startsWith("vscode") || appName.includes("visual studio code")) {
+    return "vscode";
+  }
+
+  return null;
 }
 
 export async function validateStartup(
@@ -69,10 +100,10 @@ export async function validateStartup(
   }
 
   const warnings: string[] = [];
-  const configPath = join(config.workspaceRoot, ".arashi", "config.json");
-  if (!existsSync(configPath)) {
+  const workspaceConfigRoot = await findWorkspaceConfigRoot(config.workspaceRoot);
+  if (!workspaceConfigRoot) {
     warnings.push(
-      `No Arashi workspace config found at ${configPath}. Run \"Arashi: Init Workspace\" if this workspace is not initialized yet.`,
+      `No Arashi workspace config found for ${config.workspaceRoot}. Run \"Arashi: Init Workspace\" if this workspace is not initialized yet.`,
     );
   }
 
@@ -80,4 +111,113 @@ export async function validateStartup(
     ok: true,
     warnings,
   };
+}
+
+async function findWorkspaceConfigRoot(startPath: string): Promise<string | null> {
+  let currentPath = resolve(startPath);
+
+  while (true) {
+    if (await hasArashiConfig(currentPath)) {
+      return currentPath;
+    }
+
+    const siblingConfigRoot = await findSiblingWorkspaceConfigRoot(currentPath);
+    if (siblingConfigRoot) {
+      return siblingConfigRoot;
+    }
+
+    if (currentPath === ROOT_PATH) {
+      return null;
+    }
+
+    const parentPath = dirname(currentPath);
+    if (parentPath === currentPath) {
+      return null;
+    }
+    currentPath = parentPath;
+  }
+}
+
+async function hasArashiConfig(candidateRoot: string): Promise<boolean> {
+  try {
+    await access(join(candidateRoot, ".arashi", "config.json"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findSiblingWorkspaceConfigRoot(candidateRoot: string): Promise<string | null> {
+  const commonGitDir = await resolveCommonGitDir(candidateRoot);
+  if (!commonGitDir) {
+    return null;
+  }
+
+  const siblingRoots = await resolveSiblingWorktreeRoots(commonGitDir);
+  for (const root of siblingRoots) {
+    if (await hasArashiConfig(root)) {
+      return root;
+    }
+  }
+
+  return null;
+}
+
+async function resolveCommonGitDir(candidateRoot: string): Promise<string | null> {
+  const gitEntryPath = join(candidateRoot, ".git");
+
+  try {
+    const gitEntry = await stat(gitEntryPath);
+    if (gitEntry.isDirectory()) {
+      return gitEntryPath;
+    }
+
+    if (!gitEntry.isFile()) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  try {
+    const gitDirContent = await readFile(gitEntryPath, "utf8");
+    const prefix = "gitdir:";
+    if (!gitDirContent.startsWith(prefix)) {
+      return null;
+    }
+
+    const gitDir = resolve(candidateRoot, gitDirContent.slice(prefix.length).trim());
+    const commonDirPath = join(gitDir, "commondir");
+
+    try {
+      const commonDirContent = await readFile(commonDirPath, "utf8");
+      return resolve(gitDir, commonDirContent.trim());
+    } catch {
+      return dirname(gitDir);
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function resolveSiblingWorktreeRoots(commonGitDir: string): Promise<string[]> {
+  const roots = new Set<string>([resolve(commonGitDir, "..")] );
+  const worktreesDir = join(commonGitDir, "worktrees");
+
+  try {
+    const entries = await readdir(worktreesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const gitdirFile = join(worktreesDir, entry.name, "gitdir");
+      try {
+        const linkedGitFile = resolve(worktreesDir, entry.name, (await readFile(gitdirFile, "utf8")).trim());
+        roots.add(dirname(linkedGitFile));
+      } catch {}
+    }
+  } catch {}
+
+  return [...roots];
 }

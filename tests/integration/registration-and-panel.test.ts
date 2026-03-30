@@ -9,6 +9,7 @@ const config = {
   binaryPath: "arashi",
   workspaceRoot: "/tmp/workspace",
   commandTimeoutMs: 120000,
+  editorHost: "vscode" as const,
 };
 
 function sampleWorktree(): ArashiWorktree {
@@ -16,6 +17,7 @@ function sampleWorktree(): ArashiWorktree {
     repo: "app",
     branch: "feature/test",
     path: "/tmp/workspace/repos/app/.worktrees/feature-test",
+    relationship: "current",
     hasChanges: false,
     status: "clean",
     isMain: false,
@@ -105,9 +107,9 @@ describe("integration: command registration and panel flows", () => {
     expect(store.getWorktrees()).toHaveLength(1);
   });
 
-  test("switch skips confirmation, remove requires confirmation, and actions refresh panel", async () => {
+  test("switch passes the host IDE override, remove requires confirmation, and actions refresh panel", async () => {
     const worktree = sampleWorktree();
-    const executedCommands: string[] = [];
+    const executedCommands: Array<{ command: string; args?: string[] }> = [];
     let refreshCount = 0;
     let confirmCount = 0;
     let confirmValue = true;
@@ -115,7 +117,7 @@ describe("integration: command registration and panel flows", () => {
     const handlers = createCommandHandlers({
       getConfig: () => config,
       execute: async (request) => {
-        executedCommands.push(request.command);
+        executedCommands.push({ command: request.command, args: request.args });
         return {
           ok: true,
           commandLine: `arashi ${request.command}`,
@@ -155,21 +157,28 @@ describe("integration: command registration and panel flows", () => {
     });
 
     await handlers[COMMAND_IDS.panelSwitch](worktree);
-    expect(executedCommands).toContain("switch");
+    expect(executedCommands).toContainEqual({
+      command: "switch",
+      args: [worktree.path, "--vscode"],
+    });
     expect(confirmCount).toBe(0);
 
     confirmValue = false;
     await handlers[COMMAND_IDS.panelRemove](worktree);
-    expect(executedCommands.filter((command) => command === "remove")).toHaveLength(0);
+    expect(
+      executedCommands.filter((request) => request.command === "remove"),
+    ).toHaveLength(0);
     expect(confirmCount).toBe(1);
 
     confirmValue = true;
     await handlers[COMMAND_IDS.panelRemove](worktree);
-    expect(executedCommands.filter((command) => command === "remove")).toHaveLength(1);
+    expect(
+      executedCommands.filter((request) => request.command === "remove"),
+    ).toHaveLength(1);
     expect(confirmCount).toBe(2);
 
     await handlers[COMMAND_IDS.panelAddRepo]();
-    expect(executedCommands.filter((command) => command === "add")).toHaveLength(1);
+    expect(executedCommands.filter((request) => request.command === "add")).toHaveLength(1);
     expect(refreshCount).toBe(3);
   });
 });

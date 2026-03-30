@@ -2,6 +2,7 @@ export interface ArashiWorktree {
   repo: string;
   branch: string | null;
   path: string;
+  relationship: "current" | "sibling";
   hasChanges: boolean;
   status: "clean" | "modified";
   isMain: boolean;
