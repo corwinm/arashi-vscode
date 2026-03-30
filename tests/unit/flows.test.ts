@@ -38,6 +38,10 @@ describe("command flow helpers", () => {
   });
 
   test("builds switch arguments with the detected editor host", () => {
-    expect(buildSwitchArgs("/tmp/worktree", "cursor")).toEqual(["/tmp/worktree", "--cursor"]);
+    expect(buildSwitchArgs("/tmp/worktree", "cursor")).toEqual([
+      "/tmp/worktree",
+      "--path",
+      "--cursor",
+    ]);
   });
 });

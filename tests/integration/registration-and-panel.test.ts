@@ -159,7 +159,7 @@ describe("integration: command registration and panel flows", () => {
     await handlers[COMMAND_IDS.panelSwitch](worktree);
     expect(executedCommands).toContainEqual({
       command: "switch",
-      args: [worktree.path, "--vscode"],
+      args: [worktree.path, "--path", "--vscode"],
     });
     expect(confirmCount).toBe(0);
 
@@ -180,5 +180,62 @@ describe("integration: command registration and panel flows", () => {
     await handlers[COMMAND_IDS.panelAddRepo]();
     expect(executedCommands.filter((request) => request.command === "add")).toHaveLength(1);
     expect(refreshCount).toBe(3);
+  });
+
+  test("command palette switch uses exact path mode for duplicated branch names", async () => {
+    const primary = sampleWorktree();
+    primary.branch = "main";
+    const duplicate = {
+      ...sampleWorktree(),
+      repo: "docs",
+      path: "/tmp/workspace/repos/docs/.worktrees/main",
+      branch: "main",
+    };
+    const notifications = {
+      input: async () => "",
+      pick: async <T,>(items: Array<{ label: string; value: T; description?: string; detail?: string }>) =>
+        items[1],
+      confirm: async () => false,
+      info: async () => {},
+      warn: async () => {},
+      error: async () => {},
+      success: async () => {},
+    };
+    const executedCommands: Array<{ command: string; args?: string[] }> = [];
+
+    const handlers = createCommandHandlers({
+      getConfig: () => config,
+      execute: async (request) => {
+        executedCommands.push({ command: request.command, args: request.args });
+        return {
+          ok: true,
+          commandLine: `arashi ${request.command}`,
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 1,
+        };
+      },
+      notifications,
+      output: {
+        appendLine: () => {},
+      },
+      worktreeStore: {
+        getWorktrees: () => [primary, duplicate],
+        refresh: async () => ({
+          ok: true,
+          state: {
+            worktrees: [primary, duplicate],
+          },
+        }),
+      },
+    });
+
+    await handlers[COMMAND_IDS.switch]();
+
+    expect(executedCommands).toContainEqual({
+      command: "switch",
+      args: [duplicate.path, "--path", "--vscode"],
+    });
   });
 });
