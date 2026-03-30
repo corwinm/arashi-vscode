@@ -1,4 +1,4 @@
-import { basename, dirname } from "node:path";
+import { basename, dirname, resolve, sep } from "node:path";
 import {
   normalizeCommandFailure,
   parseJsonOutput,
@@ -34,7 +34,7 @@ function isRawWorktreeItem(value: unknown): value is RawWorktreeItem {
   return typeof item.path === "string";
 }
 
-function toWorktreeModel(raw: RawWorktreeItem): ArashiWorktree {
+function toWorktreeModel(raw: RawWorktreeItem, workspaceRoot: string): ArashiWorktree {
   const path = raw.path as string;
   const branch = typeof raw.branch === "string" ? raw.branch : null;
   const hasChanges = Boolean(raw.hasChanges);
@@ -42,11 +42,21 @@ function toWorktreeModel(raw: RawWorktreeItem): ArashiWorktree {
     repo: inferRepositoryName(path),
     branch,
     path,
+    relationship: isCurrentWorktreePath(workspaceRoot, path) ? "current" : "sibling",
     hasChanges,
     status: hasChanges ? "modified" : "clean",
     isMain: Boolean(raw.isMain),
     locked: Boolean(raw.locked),
   };
+}
+
+function isCurrentWorktreePath(workspaceRoot: string, worktreePath: string): boolean {
+  const normalizedWorkspaceRoot = resolve(workspaceRoot);
+  const normalizedWorktreePath = resolve(worktreePath);
+  return (
+    normalizedWorkspaceRoot === normalizedWorktreePath ||
+    normalizedWorkspaceRoot.startsWith(`${normalizedWorktreePath}${sep}`)
+  );
 }
 
 export class WorktreeService {
@@ -101,7 +111,24 @@ export class WorktreeService {
 
     const worktrees = parsed.data
       .filter((entry) => isRawWorktreeItem(entry))
-      .map((entry) => toWorktreeModel(entry));
+      .map((entry) => toWorktreeModel(entry, config.workspaceRoot))
+      .sort((left: ArashiWorktree, right: ArashiWorktree) => {
+        if (left.relationship !== right.relationship) {
+          return left.relationship === "current" ? -1 : 1;
+        }
+
+        const repoCompare = left.repo.localeCompare(right.repo);
+        if (repoCompare !== 0) {
+          return repoCompare;
+        }
+
+        const branchCompare = (left.branch ?? "").localeCompare(right.branch ?? "");
+        if (branchCompare !== 0) {
+          return branchCompare;
+        }
+
+        return left.path.localeCompare(right.path);
+      });
 
     return {
       ok: true,

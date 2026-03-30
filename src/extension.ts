@@ -70,6 +70,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     resolveExtensionConfig(
       vscode.workspace.getConfiguration(EXTENSION_SETTINGS_SECTION),
       workspaceFoldersAsLike(vscode.workspace.workspaceFolders),
+      {
+        appName: vscode.env.appName,
+        uriScheme: vscode.env.uriScheme,
+      },
     );
 
   const worktreeService = new WorktreeService((request) => runArashiCommand(request));

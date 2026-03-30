@@ -9,8 +9,8 @@ class WorktreeItem extends vscode.TreeItem {
     const branch = worktree.branch ?? "detached";
     super(`${worktree.repo} · ${branch}`, vscode.TreeItemCollapsibleState.None);
     this.contextValue = "arashi.worktree";
-    this.description = `${worktree.status}`;
-    this.tooltip = `${worktree.path}\nRepo: ${worktree.repo}\nBranch: ${branch}`;
+    this.description = `${worktree.relationship} · ${worktree.status}`;
+    this.tooltip = `${worktree.path}\nRepo: ${worktree.repo}\nBranch: ${branch}\nRelationship: ${worktree.relationship}`;
     this.iconPath = new vscode.ThemeIcon(
       worktree.hasChanges ? "source-control" : "pass",
       new vscode.ThemeColor(worktree.hasChanges ? "charts.red" : "charts.green"),
