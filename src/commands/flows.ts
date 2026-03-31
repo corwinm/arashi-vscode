@@ -55,7 +55,7 @@ export function buildCreateArgs(branch: string): string[] {
 }
 
 export function buildSwitchArgs(target: string, editorHost: EditorHost = null): string[] {
-  const args = [target.trim()];
+  const args = [target.trim(), "--path"];
   const hostFlag = resolveSwitchHostFlag(editorHost);
   if (hostFlag) {
     args.push(hostFlag);
