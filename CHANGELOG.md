@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/corwinm/arashi-vscode/compare/v1.2.0...v1.2.1) (2026-03-31)
+
+### Bug Fixes
+
+* pass exact switch targets from VS Code ([#131](https://github.com/corwinm/arashi-vscode/issues/131)) ([#6](https://github.com/corwinm/arashi-vscode/issues/6)) ([682dfd2](https://github.com/corwinm/arashi-vscode/commit/682dfd23ee1d643a621c728c84370099b449e199))
+
 ## [1.2.0](https://github.com/corwinm/arashi-vscode/compare/v1.1.1...v1.2.0) (2026-03-30)
 
 ### Features
