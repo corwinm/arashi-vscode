@@ -110,7 +110,8 @@ describe("integration: command registration and panel flows", () => {
   test("switch passes the host IDE override, remove requires confirmation, and actions refresh panel", async () => {
     const worktree = sampleWorktree();
     const executedCommands: Array<{ command: string; args?: string[] }> = [];
-    let refreshCount = 0;
+    let panelRefreshCount = 0;
+    let storeRefreshCount = 0;
     let confirmCount = 0;
     let confirmValue = true;
 
@@ -145,7 +146,7 @@ describe("integration: command registration and panel flows", () => {
       worktreeStore: {
         getWorktrees: () => [worktree],
         refresh: async () => {
-          refreshCount += 1;
+          storeRefreshCount += 1;
           return {
             ok: true,
             state: {
@@ -153,6 +154,15 @@ describe("integration: command registration and panel flows", () => {
             },
           };
         },
+      },
+      refreshWorktreePanel: async () => {
+        panelRefreshCount += 1;
+        return {
+          ok: true,
+          state: {
+            worktrees: [worktree],
+          },
+        };
       },
     });
 
@@ -179,7 +189,88 @@ describe("integration: command registration and panel flows", () => {
 
     await handlers[COMMAND_IDS.panelAddRepo]();
     expect(executedCommands.filter((request) => request.command === "add")).toHaveLength(1);
-    expect(refreshCount).toBe(3);
+
+    await handlers[COMMAND_IDS.panelRefresh]();
+
+    expect(panelRefreshCount).toBe(4);
+    expect(storeRefreshCount).toBe(0);
+  });
+
+  test("manual refresh replaces rendered entries when discovery changes", async () => {
+    const initial = sampleWorktree();
+    const next = {
+      ...sampleWorktree(),
+      repo: "docs",
+      branch: "feature/next",
+      path: "/tmp/workspace/repos/docs/.worktrees/feature-next",
+      relationship: "sibling" as const,
+    };
+    const responses = [
+      {
+        ok: true as const,
+        worktrees: [initial],
+      },
+      {
+        ok: true as const,
+        worktrees: [next],
+      },
+    ];
+    const store = new WorktreeStore({
+      listWorktrees: async () => {
+        const response = responses.shift();
+        if (!response) {
+          throw new Error("No mock response left");
+        }
+        return response;
+      },
+    });
+    let renderedPaths: string[] = [];
+    const successMessages: string[] = [];
+    const refreshWorktreePanel = async () => {
+      const result = await store.refresh(config);
+      renderedPaths = result.state.worktrees.map((worktree) => worktree.path);
+      return result;
+    };
+
+    await refreshWorktreePanel();
+    expect(renderedPaths).toEqual([initial.path]);
+
+    const handlers = createCommandHandlers({
+      getConfig: () => config,
+      execute: async () => ({
+        ok: true,
+        commandLine: "arashi --version",
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 1,
+      }),
+      notifications: {
+        input: async () => "",
+        pick: async () => undefined,
+        confirm: async () => false,
+        info: async () => {},
+        warn: async () => {},
+        error: async () => {},
+        success: async (message) => {
+          successMessages.push(message);
+        },
+      },
+      output: {
+        appendLine: () => {},
+      },
+      worktreeStore: {
+        getWorktrees: () => store.getWorktrees(),
+        refresh: async (refreshConfig) => store.refresh(refreshConfig),
+      },
+      refreshWorktreePanel: async () => refreshWorktreePanel(),
+    });
+
+    await handlers[COMMAND_IDS.panelRefresh]();
+
+    expect(renderedPaths).toEqual([next.path]);
+    expect(store.getWorktrees().map((worktree) => worktree.path)).toEqual([next.path]);
+    expect(successMessages).toContain("Worktree panel refreshed.");
   });
 
   test("command palette switch uses exact path mode for duplicated branch names", async () => {
