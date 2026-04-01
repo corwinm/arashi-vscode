@@ -93,6 +93,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     notifications,
     output,
     worktreeStore,
+    refreshWorktreePanel: (config) => treeProvider.refresh(config),
   });
   const registrations = registerCommandHandlers(vscode.commands, handlers);
   context.subscriptions.push(...registrations);

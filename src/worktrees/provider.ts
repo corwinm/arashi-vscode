@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { COMMAND_IDS } from "../constants";
 import type { ResolvedExtensionConfig } from "../config";
 import { WorktreeStore } from "./store";
-import type { ArashiWorktree } from "./types";
+import type { ArashiWorktree, WorktreeRefreshResult } from "./types";
 
 class WorktreeItem extends vscode.TreeItem {
   constructor(worktree: ArashiWorktree) {
@@ -47,9 +47,10 @@ export class WorktreeTreeDataProvider
 
   constructor(private readonly store: WorktreeStore) {}
 
-  async refresh(config: ResolvedExtensionConfig): Promise<void> {
-    await this.store.refresh(config);
+  async refresh(config: ResolvedExtensionConfig): Promise<WorktreeRefreshResult> {
+    const result = await this.store.refresh(config);
     this.onDidChangeTreeDataEmitter.fire(undefined);
+    return result;
   }
 
   getTreeItem(element: WorktreeItem | PlaceholderItem): vscode.TreeItem {
