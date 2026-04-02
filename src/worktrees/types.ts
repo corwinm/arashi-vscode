@@ -1,3 +1,5 @@
+import type { RelatedRepository } from "../workspace/context";
+
 export interface ArashiWorktree {
   repo: string;
   branch: string | null;
@@ -24,6 +26,7 @@ export type WorktreeListResult =
     };
 
 export interface WorktreeStoreState {
+  relatedRepositories: RelatedRepository[];
   worktrees: ArashiWorktree[];
   banner?: {
     kind: "empty" | "warning" | "error";
@@ -42,3 +45,5 @@ export type WorktreeRefreshResult =
       reason: WorktreeFetchErrorKind;
       preservedLastKnown: boolean;
     };
+
+export type { RelatedRepository };

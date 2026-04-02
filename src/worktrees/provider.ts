@@ -1,13 +1,36 @@
 import * as vscode from "vscode";
 import { COMMAND_IDS } from "../constants";
 import type { ResolvedExtensionConfig } from "../config";
+import { buildRepositoryGroups, describeRepository } from "./presentation";
 import { WorktreeStore } from "./store";
-import type { ArashiWorktree } from "./types";
+import type { ArashiWorktree, RelatedRepository } from "./types";
+
+type TreeNode = RepositoryItem | WorktreeItem | PlaceholderItem;
+
+class RepositoryItem extends vscode.TreeItem {
+  constructor(
+    readonly repository: RelatedRepository,
+    readonly worktrees: readonly ArashiWorktree[],
+  ) {
+    super(
+      repository.name,
+      worktrees.length > 0
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.None,
+    );
+    this.contextValue = "arashi.repo";
+    this.description = describeRepository(repository, worktrees.length);
+    this.tooltip = `${repository.path}\n${describeRepository(repository)}`;
+    this.iconPath = new vscode.ThemeIcon(
+      repository.kind === "workspace-root" ? "root-folder" : "repo",
+    );
+  }
+}
 
 class WorktreeItem extends vscode.TreeItem {
-  constructor(worktree: ArashiWorktree) {
+  constructor(readonly worktree: ArashiWorktree) {
     const branch = worktree.branch ?? "detached";
-    super(`${worktree.repo} · ${branch}`, vscode.TreeItemCollapsibleState.None);
+    super(branch, vscode.TreeItemCollapsibleState.None);
     this.contextValue = "arashi.worktree";
     this.description = `${worktree.relationship} · ${worktree.status}`;
     this.tooltip = `${worktree.path}\nRepo: ${worktree.repo}\nBranch: ${branch}\nRelationship: ${worktree.relationship}`;
@@ -18,7 +41,7 @@ class WorktreeItem extends vscode.TreeItem {
     this.command = {
       command: COMMAND_IDS.panelSwitch,
       title: "Switch Worktree",
-      arguments: [worktree],
+      arguments: [this],
     };
   }
 }
@@ -37,11 +60,8 @@ class PlaceholderItem extends vscode.TreeItem {
   }
 }
 
-export class WorktreeTreeDataProvider
-  implements vscode.TreeDataProvider<WorktreeItem | PlaceholderItem>
-{
-  private readonly onDidChangeTreeDataEmitter =
-    new vscode.EventEmitter<WorktreeItem | PlaceholderItem | undefined>();
+export class WorktreeTreeDataProvider implements vscode.TreeDataProvider<TreeNode> {
+  private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<TreeNode | undefined>();
 
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
@@ -52,25 +72,39 @@ export class WorktreeTreeDataProvider
     this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
-  getTreeItem(element: WorktreeItem | PlaceholderItem): vscode.TreeItem {
+  getTreeItem(element: TreeNode): vscode.TreeItem {
     return element;
   }
 
-  getChildren(): vscode.ProviderResult<(WorktreeItem | PlaceholderItem)[]> {
+  getChildren(element?: TreeNode): vscode.ProviderResult<TreeNode[]> {
     const state = this.store.getState();
-    if (state.worktrees.length > 0) {
-      return state.worktrees.map((worktree) => new WorktreeItem(worktree));
+
+    if (element instanceof RepositoryItem) {
+      return element.worktrees.map((worktree) => new WorktreeItem(worktree));
     }
 
-    if (state.banner) {
-      return [new PlaceholderItem(state.banner.message, state.banner.kind)];
+    if (element) {
+      return [];
     }
 
-    return [
-      new PlaceholderItem(
-        "No worktrees loaded yet. Run Refresh Arashi Worktrees.",
-        "empty",
-      ),
-    ];
+    if (state.worktrees.length === 0) {
+      const placeholder = state.banner
+        ? new PlaceholderItem(state.banner.message, state.banner.kind)
+        : new PlaceholderItem("No worktrees loaded yet. Run Refresh Arashi Worktrees.", "empty");
+      const repositories = state.relatedRepositories.length
+        ? buildRepositoryGroups(state.relatedRepositories, state.worktrees).map(
+            ({ repository, worktrees }) => new RepositoryItem(repository, worktrees),
+          )
+        : [];
+      return [placeholder, ...repositories];
+    }
+
+    if (state.relatedRepositories.length > 0) {
+      return buildRepositoryGroups(state.relatedRepositories, state.worktrees).map(
+        ({ repository, worktrees }) => new RepositoryItem(repository, worktrees),
+      );
+    }
+
+    return state.worktrees.map((worktree) => new WorktreeItem(worktree));
   }
 }

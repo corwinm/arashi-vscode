@@ -6,7 +6,8 @@ import {
   type CommandFailure,
 } from "../cli/runner";
 import type { ResolvedExtensionConfig } from "../config";
-import type { ArashiWorktree, WorktreeListResult } from "./types";
+import { resolveArashiWorkspaceContext } from "../workspace/context";
+import type { ArashiWorktree, RelatedRepository, WorktreeListResult } from "./types";
 
 interface RawWorktreeItem {
   path?: unknown;
@@ -61,6 +62,11 @@ function isCurrentWorktreePath(workspaceRoot: string, worktreePath: string): boo
 
 export class WorktreeService {
   constructor(private readonly execute: CommandExecutor) {}
+
+  async listRelatedRepositories(config: ResolvedExtensionConfig): Promise<RelatedRepository[]> {
+    const context = await resolveArashiWorkspaceContext(config.workspaceRoot);
+    return context?.repositories ?? [];
+  }
 
   async listWorktrees(config: ResolvedExtensionConfig): Promise<WorktreeListResult> {
     const commandResult = await this.execute({
