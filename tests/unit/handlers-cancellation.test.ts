@@ -60,7 +60,8 @@ describe("handlers cancellation paths", () => {
 
   test("executes pull and sync through the command runner", async () => {
     const executedCommands: string[] = [];
-    let refreshCount = 0;
+    let panelRefreshCount = 0;
+    let storeRefreshCount = 0;
 
     const handlers = createCommandHandlers({
       getConfig: () => ({
@@ -96,7 +97,7 @@ describe("handlers cancellation paths", () => {
         getRelatedRepositories: () => [],
         getWorktrees: () => [],
         refresh: async () => {
-          refreshCount += 1;
+          storeRefreshCount += 1;
           return {
             ok: true,
             state: {
@@ -106,13 +107,24 @@ describe("handlers cancellation paths", () => {
           };
         },
       },
+      refreshWorktreePanel: async () => {
+        panelRefreshCount += 1;
+        return {
+          ok: true,
+          state: {
+            relatedRepositories: [],
+            worktrees: [],
+          },
+        };
+      },
     });
 
     await handlers[COMMAND_IDS.pull]();
     await handlers[COMMAND_IDS.sync]();
 
     expect(executedCommands).toEqual(["pull", "sync"]);
-    expect(refreshCount).toBe(2);
+    expect(panelRefreshCount).toBe(2);
+    expect(storeRefreshCount).toBe(0);
   });
 
   test("shows a user-visible error when pull fails", async () => {

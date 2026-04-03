@@ -3,7 +3,7 @@ import { COMMAND_IDS } from "../constants";
 import type { ResolvedExtensionConfig } from "../config";
 import { buildRepositoryGroups, describeRepository } from "./presentation";
 import { WorktreeStore } from "./store";
-import type { ArashiWorktree, RelatedRepository } from "./types";
+import type { ArashiWorktree, RelatedRepository, WorktreeRefreshResult } from "./types";
 
 type TreeNode = RepositoryItem | WorktreeItem | PlaceholderItem;
 
@@ -26,7 +26,6 @@ class RepositoryItem extends vscode.TreeItem {
     );
   }
 }
-
 class WorktreeItem extends vscode.TreeItem {
   constructor(readonly worktree: ArashiWorktree) {
     const branch = worktree.branch ?? "detached";
@@ -67,9 +66,10 @@ export class WorktreeTreeDataProvider implements vscode.TreeDataProvider<TreeNod
 
   constructor(private readonly store: WorktreeStore) {}
 
-  async refresh(config: ResolvedExtensionConfig): Promise<void> {
-    await this.store.refresh(config);
+  async refresh(config: ResolvedExtensionConfig): Promise<WorktreeRefreshResult> {
+    const result = await this.store.refresh(config);
     this.onDidChangeTreeDataEmitter.fire(undefined);
+    return result;
   }
 
   getTreeItem(element: TreeNode): vscode.TreeItem {

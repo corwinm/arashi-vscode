@@ -73,6 +73,7 @@ export interface CommandHandlerDependencies {
     getWorktrees(): ArashiWorktree[];
     refresh(config: ResolvedExtensionConfig): Promise<WorktreeRefreshResult>;
   };
+  refreshWorktreePanel?: (config: ResolvedExtensionConfig) => Promise<WorktreeRefreshResult>;
   discoverMissingRepositories?: MissingRepositoryDiscovery;
 }
 
@@ -211,7 +212,9 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
   };
 
   const refreshPanelState = async (): Promise<void> => {
-    const refreshResult = await deps.worktreeStore.refresh(deps.getConfig());
+    const refreshResult = deps.refreshWorktreePanel
+      ? await deps.refreshWorktreePanel(deps.getConfig())
+      : await deps.worktreeStore.refresh(deps.getConfig());
     if (!refreshResult.ok && refreshResult.state.banner) {
       await safeNotify(deps.notifications.warn(refreshResult.state.banner.message));
     }
