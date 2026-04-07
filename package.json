@@ -58,7 +58,8 @@
       },
       {
         "command": "arashi.create",
-        "title": "Arashi: Create Worktree"
+        "title": "Arashi: Create Worktree",
+        "icon": "$(add)"
       },
       {
         "command": "arashi.openWorkspaceRoot",

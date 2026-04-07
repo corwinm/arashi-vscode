@@ -1,59 +1,67 @@
+import { resolve } from "node:path";
 import type { ArashiWorktree, RelatedRepository } from "./types";
 
-export interface RepositoryGroup {
+export interface WorktreeRepositoryLink {
   repository: RelatedRepository;
-  worktrees: ArashiWorktree[];
+  path: string;
+  hasChanges: boolean;
 }
 
-export function describeRepository(
-  repository: RelatedRepository,
-  worktreeCount?: number,
+export interface WorktreeGroup {
+  worktree: ArashiWorktree;
+  repositories: WorktreeRepositoryLink[];
+}
+
+export function describeWorktree(
+  worktree: ArashiWorktree,
+  repositories: readonly WorktreeRepositoryLink[] = [],
 ): string {
-  const relationshipLabel =
-    repository.relationship === "current"
-      ? "current repo"
-      : repository.relationship === "parent"
-        ? "parent repo"
-        : "child repo";
-
-  if (worktreeCount === undefined) {
-    return relationshipLabel;
-  }
-
-  return `${relationshipLabel} · ${worktreeCount} worktree${worktreeCount === 1 ? "" : "s"}`;
+  const hasModifiedChildren = repositories.some((repository) => repository.hasChanges);
+  return `${worktree.relationship} · ${worktree.hasChanges || hasModifiedChildren ? "modified" : "clean"}`;
 }
 
-export function buildRepositoryGroups(
+export function describeSubRepository(link: WorktreeRepositoryLink): string | undefined {
+  const labels = [
+    link.repository.relationship === "current" ? "current" : undefined,
+    link.hasChanges ? "modified" : undefined,
+  ].filter((value): value is string => Boolean(value));
+
+  return labels.length > 0 ? labels.join(" · ") : undefined;
+}
+
+function isTopLevelWorktree(
+  worktree: ArashiWorktree,
   repositories: readonly RelatedRepository[],
-  worktrees: readonly ArashiWorktree[],
-): RepositoryGroup[] {
-  const workspaceRootRepository = repositories.find(
-    (repository) => repository.kind === "workspace-root",
-  );
-  const groupedWorktrees = new Map<string, ArashiWorktree[]>();
-
-  for (const repository of repositories) {
-    groupedWorktrees.set(repository.path, []);
-  }
-
-  for (const worktree of worktrees) {
-    const repository =
-      repositories.find(
-        (candidate) => candidate.kind === "child-repo" && candidate.name === worktree.repo,
-      ) ?? workspaceRootRepository;
-
-    if (!repository) {
-      continue;
+): boolean {
+  return !repositories.some((repository) => {
+    if (repository.kind !== "child-repo" || !repository.relativePath || repository.relativePath === ".") {
+      return false;
     }
 
-    groupedWorktrees.get(repository.path)?.push(worktree);
-  }
+    const normalizedWorktreePath = resolve(worktree.path);
+    const normalizedRelativePath = repository.relativePath.replace(/\\/g, "/").replace(/^\.\//, "");
+    return (
+      normalizedWorktreePath.endsWith(`/${normalizedRelativePath}`) ||
+      normalizedWorktreePath.endsWith(`\\${normalizedRelativePath.replace(/\//g, "\\")}`)
+    );
+  });
+}
 
-  return repositories.map((repository) => ({
-    repository,
-    worktrees: (groupedWorktrees.get(repository.path) ?? []).sort((left, right) => {
+export function buildWorktreeGroups(
+  repositories: readonly RelatedRepository[],
+  worktrees: readonly ArashiWorktree[],
+): WorktreeGroup[] {
+  const childRepositories = repositories.filter((repository) => repository.kind === "child-repo");
+
+  return worktrees
+    .filter((worktree) => isTopLevelWorktree(worktree, repositories))
+    .sort((left, right) => {
       if (left.relationship !== right.relationship) {
         return left.relationship === "current" ? -1 : 1;
+      }
+
+      if (left.isMain !== right.isMain) {
+        return left.isMain ? -1 : 1;
       }
 
       const branchCompare = (left.branch ?? "").localeCompare(right.branch ?? "");
@@ -62,6 +70,25 @@ export function buildRepositoryGroups(
       }
 
       return left.path.localeCompare(right.path);
-    }),
-  }));
+    })
+    .map((worktree) => ({
+      worktree,
+      repositories: childRepositories.map((repository) => {
+        const status = worktree.subRepositories.find(
+          (subRepository) => subRepository.relativePath === repository.relativePath,
+        );
+
+        return {
+          repository: {
+            ...repository,
+            relationship:
+              worktree.relationship === "current" && repository.relationship === "current"
+                ? "current"
+                : "child",
+          },
+          path: resolve(worktree.path, repository.relativePath),
+          hasChanges: status?.hasChanges ?? false,
+        };
+      }),
+    }));
 }

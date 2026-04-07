@@ -1,11 +1,12 @@
 import { access, readFile, readdir, stat } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 const ROOT_PATH = "/";
 
 export interface RelatedRepository {
   name: string;
   path: string;
+  relativePath: string;
   kind: "workspace-root" | "child-repo";
   relationship: "current" | "parent" | "child";
 }
@@ -63,6 +64,7 @@ export async function resolveArashiWorkspaceContext(
     {
       name: basename(resolve(workspaceRoot)),
       path: workspaceRoot,
+      relativePath: ".",
       kind: "workspace-root",
       relationship: currentRepositoryPath === resolve(workspaceRoot) ? "current" : "parent",
     },
@@ -117,6 +119,7 @@ async function loadConfiguredRepositories(
     repositories.push({
       name,
       path: repositoryPath,
+      relativePath: relative(workspaceRoot, repositoryPath) || ".",
       kind: "child-repo",
     });
   }

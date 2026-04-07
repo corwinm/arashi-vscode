@@ -41,10 +41,16 @@ describe("workspace context", () => {
     const context = await resolveArashiWorkspaceContext(childRepo);
 
     expect(context?.workspaceRoot).toBe(workspaceRoot);
-    expect(context?.repositories.map((repository) => [repository.name, repository.relationship])).toEqual([
-      ["arashi-vscode", "current"],
-      ["workspace-main", "parent"],
-      ["arashi-docs", "child"],
+    expect(
+      context?.repositories.map((repository) => [
+        repository.name,
+        repository.relationship,
+        repository.relativePath,
+      ]),
+    ).toEqual([
+      ["arashi-vscode", "current", "repos/arashi-vscode"],
+      ["workspace-main", "parent", "."],
+      ["arashi-docs", "child", "repos/arashi-docs"],
     ]);
   });
 
@@ -74,6 +80,7 @@ describe("workspace context", () => {
     expect(context?.repositories[0]).toMatchObject({
       name: "workspace-main",
       relationship: "current",
+      relativePath: ".",
       kind: "workspace-root",
     });
   });

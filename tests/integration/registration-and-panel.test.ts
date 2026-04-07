@@ -17,14 +17,21 @@ const config = {
 
 function sampleWorktree(): ArashiWorktree {
   return {
-    repo: "app",
+    repo: "workspace-main",
     branch: "feature/test",
-    path: "/tmp/workspace/repos/app/.worktrees/feature-test",
+    path: "/tmp/workspace-feature-test",
     relationship: "current",
     hasChanges: false,
     status: "clean",
     isMain: false,
     locked: false,
+    subRepositories: [
+      {
+        relativePath: "repos/app",
+        branch: "feature/test",
+        hasChanges: false,
+      },
+    ],
   };
 }
 
@@ -33,12 +40,14 @@ function sampleRepositories(rootPath = "/tmp/workspace"): RelatedRepository[] {
     {
       name: "workspace-main",
       path: rootPath,
+      relativePath: ".",
       kind: "workspace-root",
       relationship: "parent",
     },
     {
       name: "app",
       path: join(rootPath, "repos", "app"),
+      relativePath: "repos/app",
       kind: "child-repo",
       relationship: "current",
     },
@@ -243,9 +252,9 @@ describe("integration: command registration and panel flows", () => {
     const initial = sampleWorktree();
     const next = {
       ...sampleWorktree(),
-      repo: "docs",
+      repo: "workspace-feature-next",
       branch: "feature/next",
-      path: "/tmp/workspace/repos/docs/.worktrees/feature-next",
+      path: "/tmp/workspace-feature-next",
       relationship: "sibling" as const,
     };
     const responses = [
@@ -323,8 +332,8 @@ describe("integration: command registration and panel flows", () => {
     primary.branch = "main";
     const duplicate = {
       ...sampleWorktree(),
-      repo: "docs",
-      path: "/tmp/workspace/repos/docs/.worktrees/main",
+      repo: "workspace-main-copy",
+      path: "/tmp/workspace-main-copy",
       branch: "main",
     };
     const notifications = {

@@ -1,4 +1,4 @@
-import { basename, dirname, resolve, sep } from "node:path";
+import { basename, resolve, sep } from "node:path";
 import {
   normalizeCommandFailure,
   parseJsonOutput,
@@ -7,7 +7,7 @@ import {
 } from "../cli/runner";
 import type { ResolvedExtensionConfig } from "../config";
 import { resolveArashiWorkspaceContext } from "../workspace/context";
-import type { ArashiWorktree, RelatedRepository, WorktreeListResult } from "./types";
+import type { ArashiSubRepository, ArashiWorktree, RelatedRepository, WorktreeListResult } from "./types";
 
 interface RawWorktreeItem {
   path?: unknown;
@@ -15,6 +15,13 @@ interface RawWorktreeItem {
   hasChanges?: unknown;
   isMain?: unknown;
   locked?: unknown;
+  subRepositories?: unknown;
+}
+
+interface RawSubRepositoryItem {
+  relativePath?: unknown;
+  branch?: unknown;
+  hasChanges?: unknown;
 }
 
 function inferRepositoryName(worktreePath: string): string {
@@ -23,7 +30,25 @@ function inferRepositoryName(worktreePath: string): string {
   if (reposIndex >= 0 && reposIndex + 1 < segments.length) {
     return segments[reposIndex + 1];
   }
-  return basename(dirname(worktreePath)) || basename(worktreePath) || worktreePath;
+  return basename(worktreePath) || worktreePath;
+}
+
+function isChildRepositoryWorktreePath(
+  worktreePath: string,
+  childRepositoryRelativePaths: readonly string[],
+): boolean {
+  const normalizedWorktreePath = resolve(worktreePath);
+  return childRepositoryRelativePaths.some((relativePath) => {
+    if (!relativePath || relativePath === ".") {
+      return false;
+    }
+
+    const normalizedSuffix = relativePath.replace(/\\/g, "/").replace(/^\.\//, "");
+    return (
+      normalizedWorktreePath.endsWith(`/${normalizedSuffix}`) ||
+      normalizedWorktreePath.endsWith(`\\${normalizedSuffix.replace(/\//g, "\\")}`)
+    );
+  });
 }
 
 function isRawWorktreeItem(value: unknown): value is RawWorktreeItem {
@@ -35,7 +60,24 @@ function isRawWorktreeItem(value: unknown): value is RawWorktreeItem {
   return typeof item.path === "string";
 }
 
-function toWorktreeModel(raw: RawWorktreeItem, workspaceRoot: string): ArashiWorktree {
+function isRawSubRepositoryItem(value: unknown): value is RawSubRepositoryItem {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const item = value as RawSubRepositoryItem;
+  return typeof item.relativePath === "string";
+}
+
+function toSubRepositoryModel(raw: RawSubRepositoryItem): ArashiSubRepository {
+  return {
+    relativePath: raw.relativePath as string,
+    branch: typeof raw.branch === "string" ? raw.branch : null,
+    hasChanges: Boolean(raw.hasChanges),
+  };
+}
+
+function toWorktreeModel(raw: RawWorktreeItem): Omit<ArashiWorktree, "relationship"> {
   const path = raw.path as string;
   const branch = typeof raw.branch === "string" ? raw.branch : null;
   const hasChanges = Boolean(raw.hasChanges);
@@ -43,21 +85,34 @@ function toWorktreeModel(raw: RawWorktreeItem, workspaceRoot: string): ArashiWor
     repo: inferRepositoryName(path),
     branch,
     path,
-    relationship: isCurrentWorktreePath(workspaceRoot, path) ? "current" : "sibling",
     hasChanges,
     status: hasChanges ? "modified" : "clean",
     isMain: Boolean(raw.isMain),
     locked: Boolean(raw.locked),
+    subRepositories: Array.isArray(raw.subRepositories)
+      ? raw.subRepositories.filter((entry) => isRawSubRepositoryItem(entry)).map(toSubRepositoryModel)
+      : [],
   };
 }
 
-function isCurrentWorktreePath(workspaceRoot: string, worktreePath: string): boolean {
-  const normalizedWorkspaceRoot = resolve(workspaceRoot);
-  const normalizedWorktreePath = resolve(worktreePath);
+function isPathWithin(candidatePath: string, containerPath: string): boolean {
+  const normalizedCandidatePath = resolve(candidatePath);
+  const normalizedContainerPath = resolve(containerPath);
   return (
-    normalizedWorkspaceRoot === normalizedWorktreePath ||
-    normalizedWorkspaceRoot.startsWith(`${normalizedWorktreePath}${sep}`)
+    normalizedCandidatePath === normalizedContainerPath ||
+    normalizedCandidatePath.startsWith(`${normalizedContainerPath}${sep}`)
   );
+}
+
+function resolveCurrentTopLevelWorktreePath(
+  workspaceRoot: string,
+  worktrees: Array<Omit<ArashiWorktree, "relationship">>,
+): string | null {
+  const normalizedWorkspaceRoot = resolve(workspaceRoot);
+  return worktrees
+    .map((worktree) => resolve(worktree.path))
+    .filter((worktreePath) => isPathWithin(normalizedWorkspaceRoot, worktreePath))
+    .sort((left, right) => right.length - left.length)[0] ?? null;
 }
 
 export class WorktreeService {
@@ -69,10 +124,15 @@ export class WorktreeService {
   }
 
   async listWorktrees(config: ResolvedExtensionConfig): Promise<WorktreeListResult> {
+    const workspaceContext = await resolveArashiWorkspaceContext(config.workspaceRoot);
+    const childRepositoryRelativePaths = (workspaceContext?.repositories ?? [])
+      .filter((repository) => repository.kind === "child-repo")
+      .map((repository) => repository.relativePath);
+
     const commandResult = await this.execute({
       binaryPath: config.binaryPath,
       command: "list",
-      args: [],
+      args: ["--verbose"],
       cwd: config.workspaceRoot,
       timeoutMs: config.commandTimeoutMs,
       enforceJson: true,
@@ -115,17 +175,33 @@ export class WorktreeService {
       };
     }
 
-    const worktrees = parsed.data
+    const parsedWorktrees = parsed.data
       .filter((entry) => isRawWorktreeItem(entry))
-      .map((entry) => toWorktreeModel(entry, config.workspaceRoot))
+      .map((entry) => toWorktreeModel(entry))
+      .filter(
+        (worktree) => !isChildRepositoryWorktreePath(worktree.path, childRepositoryRelativePaths),
+      );
+
+    const currentTopLevelWorktreePath = resolveCurrentTopLevelWorktreePath(
+      config.workspaceRoot,
+      parsedWorktrees,
+    );
+
+    const worktrees = parsedWorktrees
+      .map((worktree) => ({
+        ...worktree,
+        relationship:
+          currentTopLevelWorktreePath && resolve(worktree.path) === currentTopLevelWorktreePath
+            ? ("current" as const)
+            : ("sibling" as const),
+      }))
       .sort((left: ArashiWorktree, right: ArashiWorktree) => {
         if (left.relationship !== right.relationship) {
           return left.relationship === "current" ? -1 : 1;
         }
 
-        const repoCompare = left.repo.localeCompare(right.repo);
-        if (repoCompare !== 0) {
-          return repoCompare;
+        if (left.isMain !== right.isMain) {
+          return left.isMain ? -1 : 1;
         }
 
         const branchCompare = (left.branch ?? "").localeCompare(right.branch ?? "");

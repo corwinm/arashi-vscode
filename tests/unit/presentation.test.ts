@@ -1,74 +1,165 @@
 import { describe, expect, test } from "bun:test";
-import { buildRepositoryGroups, describeRepository } from "../../src/worktrees/presentation";
+import {
+  buildWorktreeGroups,
+  describeSubRepository,
+  describeWorktree,
+} from "../../src/worktrees/presentation";
 import type { ArashiWorktree, RelatedRepository } from "../../src/worktrees/types";
 
 describe("worktree presentation", () => {
-  test("groups worktrees under the matching child repo and falls back to workspace root", () => {
+  test("builds top-level worktree groups with derived child repo paths", () => {
     const repositories: RelatedRepository[] = [
       {
         name: "workspace-main",
         path: "/tmp/workspace",
+        relativePath: ".",
         kind: "workspace-root",
         relationship: "parent",
       },
       {
         name: "app",
         path: "/tmp/workspace/repos/app",
+        relativePath: "repos/app",
         kind: "child-repo",
         relationship: "current",
+      },
+      {
+        name: "docs",
+        path: "/tmp/workspace/repos/docs",
+        relativePath: "repos/docs",
+        kind: "child-repo",
+        relationship: "child",
       },
     ];
     const worktrees: ArashiWorktree[] = [
       {
-        repo: "app",
-        branch: "feature/test",
-        path: "/tmp/workspace/repos/app/.worktrees/feature-test",
+        repo: "workspace-main",
+        branch: "main",
+        path: "/tmp/workspace",
         relationship: "current",
+        hasChanges: false,
+        status: "clean",
+        isMain: true,
+        locked: false,
+        subRepositories: [
+          {
+            relativePath: "repos/app",
+            branch: "main",
+            hasChanges: false,
+          },
+          {
+            relativePath: "repos/docs",
+            branch: "main",
+            hasChanges: true,
+          },
+        ],
+      },
+      {
+        repo: "workspace-feature-a",
+        branch: "feature/a",
+        path: "/tmp/workspace-feature-a",
+        relationship: "sibling",
+        hasChanges: true,
+        status: "modified",
+        isMain: false,
+        locked: false,
+        subRepositories: [
+          {
+            relativePath: "repos/app",
+            branch: "feature/a",
+            hasChanges: true,
+          },
+          {
+            relativePath: "repos/docs",
+            branch: "feature/a",
+            hasChanges: false,
+          },
+        ],
+      },
+      {
+        repo: "app",
+        branch: "feature/a",
+        path: "/tmp/workspace-feature-a/repos/app",
+        relationship: "sibling",
         hasChanges: false,
         status: "clean",
         isMain: false,
         locked: false,
-      },
-      {
-        repo: "workspace-main",
-        branch: "main",
-        path: "/tmp/workspace-main",
-        relationship: "sibling",
-        hasChanges: true,
-        status: "modified",
-        isMain: true,
-        locked: false,
+        subRepositories: [],
       },
     ];
 
-    const groups = buildRepositoryGroups(repositories, worktrees);
+    const groups = buildWorktreeGroups(repositories, worktrees);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0].repository.name).toBe("workspace-main");
-    expect(groups[0].worktrees.map((worktree) => worktree.repo)).toEqual(["workspace-main"]);
-    expect(groups[1].repository.name).toBe("app");
-    expect(groups[1].worktrees.map((worktree) => worktree.repo)).toEqual(["app"]);
+    expect(groups.map((group) => group.worktree.path)).toEqual([
+      "/tmp/workspace",
+      "/tmp/workspace-feature-a",
+    ]);
+    expect(groups[1].repositories.map((repository) => repository.path)).toEqual([
+      "/tmp/workspace-feature-a/repos/app",
+      "/tmp/workspace-feature-a/repos/docs",
+    ]);
+    expect(groups[1].repositories.map((repository) => repository.hasChanges)).toEqual([true, false]);
   });
 
-  test("describes current and parent repositories distinctly", () => {
+  test("describes top-level worktrees", () => {
     expect(
-      describeRepository({
-        name: "app",
-        path: "/tmp/workspace/repos/app",
-        kind: "child-repo",
+      describeWorktree({
+        repo: "workspace-main",
+        branch: "main",
+        path: "/tmp/workspace",
         relationship: "current",
+        hasChanges: false,
+        status: "clean",
+        isMain: true,
+        locked: false,
+        subRepositories: [],
       }),
-    ).toBe("current repo");
+    ).toBe("current · clean");
     expect(
-      describeRepository(
+      describeWorktree(
         {
-          name: "workspace-main",
-          path: "/tmp/workspace",
-          kind: "workspace-root",
-          relationship: "parent",
+          repo: "workspace-feature-a",
+          branch: "feature/a",
+          path: "/tmp/workspace-feature-a",
+          relationship: "sibling",
+          hasChanges: false,
+          status: "clean",
+          isMain: false,
+          locked: false,
+          subRepositories: [],
         },
-        2,
+        [
+          {
+            repository: {
+              name: "app",
+              path: "/tmp/workspace/repos/app",
+              relativePath: "repos/app",
+              kind: "child-repo",
+              relationship: "child",
+            },
+            path: "/tmp/workspace-feature-a/repos/app",
+            hasChanges: true,
+          },
+        ],
       ),
-    ).toBe("parent repo · 2 worktrees");
+    ).toBe("sibling · modified");
+  });
+
+  test("describes modified child repositories", () => {
+    expect(
+      describeSubRepository({
+        repository: {
+          name: "app",
+          path: "/tmp/workspace/repos/app",
+          relativePath: "repos/app",
+          kind: "child-repo",
+          relationship: "current",
+        },
+        path: "/tmp/workspace-feature-a/repos/app",
+        hasChanges: true,
+      }),
+    ).toBe("current · modified");
   });
 });
