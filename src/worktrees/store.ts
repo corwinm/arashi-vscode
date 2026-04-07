@@ -1,5 +1,6 @@
 import type { ResolvedExtensionConfig } from "../config";
 import type {
+  RelatedRepository,
   WorktreeListResult,
   WorktreeRefreshResult,
   WorktreeStoreState,
@@ -7,10 +8,12 @@ import type {
 } from "./types";
 
 export interface WorktreeServiceLike {
+  listRelatedRepositories(config: ResolvedExtensionConfig): Promise<RelatedRepository[]>;
   listWorktrees(config: ResolvedExtensionConfig): Promise<WorktreeListResult>;
 }
 
 export class WorktreeStore {
+  private relatedRepositories: RelatedRepository[] = [];
   private worktrees: ArashiWorktree[] = [];
   private lastKnownWorktrees: ArashiWorktree[] = [];
   private banner: WorktreeStoreState["banner"];
@@ -21,15 +24,25 @@ export class WorktreeStore {
     return [...this.worktrees];
   }
 
+  getRelatedRepositories(): RelatedRepository[] {
+    return [...this.relatedRepositories];
+  }
+
   getState(): WorktreeStoreState {
     return {
+      relatedRepositories: [...this.relatedRepositories],
       worktrees: [...this.worktrees],
       banner: this.banner,
     };
   }
 
   async refresh(config: ResolvedExtensionConfig): Promise<WorktreeRefreshResult> {
-    const result = await this.service.listWorktrees(config);
+    const [result, relatedRepositories] = await Promise.all([
+      this.service.listWorktrees(config),
+      this.service.listRelatedRepositories(config),
+    ]);
+    this.relatedRepositories = relatedRepositories;
+
     if (result.ok) {
       this.worktrees = result.worktrees;
       this.lastKnownWorktrees = [...result.worktrees];

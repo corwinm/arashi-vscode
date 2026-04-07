@@ -29,11 +29,14 @@
     "onCommand:arashi.add",
     "onCommand:arashi.clone",
     "onCommand:arashi.create",
+    "onCommand:arashi.openWorkspaceRoot",
+    "onCommand:arashi.openRepository",
     "onCommand:arashi.pull",
     "onCommand:arashi.sync",
     "onCommand:arashi.switch",
     "onCommand:arashi.remove",
     "onCommand:arashi.worktrees.refresh",
+    "onCommand:arashi.worktrees.openRepo",
     "onCommand:arashi.worktrees.switch",
     "onCommand:arashi.worktrees.remove",
     "onCommand:arashi.worktrees.addRepo",
@@ -55,7 +58,16 @@
       },
       {
         "command": "arashi.create",
-        "title": "Arashi: Create Worktree"
+        "title": "Arashi: Create Worktree",
+        "icon": "$(add)"
+      },
+      {
+        "command": "arashi.openWorkspaceRoot",
+        "title": "Arashi: Open Workspace Root"
+      },
+      {
+        "command": "arashi.openRepository",
+        "title": "Arashi: Open Related Repository"
       },
       {
         "command": "arashi.pull",
@@ -77,6 +89,11 @@
         "command": "arashi.worktrees.refresh",
         "title": "Refresh Arashi Worktrees",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "arashi.worktrees.openRepo",
+        "title": "Open Repository",
+        "icon": "$(go-to-file)"
       },
       {
         "command": "arashi.worktrees.switch",
@@ -105,7 +122,7 @@
     "menus": {
       "view/title": [
         {
-          "command": "arashi.worktrees.addRepo",
+          "command": "arashi.create",
           "when": "view == arashi.worktrees",
           "group": "navigation@1"
         },
@@ -116,6 +133,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "arashi.worktrees.openRepo",
+          "when": "view == arashi.worktrees && viewItem == arashi.repo",
+          "group": "inline@1"
+        },
         {
           "command": "arashi.worktrees.switch",
           "when": "view == arashi.worktrees && viewItem == arashi.worktree",

@@ -11,7 +11,11 @@ import {
 import { COMMAND_IDS } from "../constants";
 import type { ResolvedExtensionConfig } from "../config";
 import { logCommandInvocation, logCommandResult, logDiagnostic, type OutputSink } from "../output";
-import type { ArashiWorktree, WorktreeRefreshResult } from "../worktrees/types";
+import type {
+  ArashiWorktree,
+  RelatedRepository,
+  WorktreeRefreshResult,
+} from "../worktrees/types";
 import {
   buildAddArgs,
   buildCloneArgs,
@@ -62,8 +66,10 @@ export interface CommandHandlerDependencies {
   getConfig(): ResolvedExtensionConfig;
   execute: CommandExecutor;
   notifications: Notifications;
+  openFolder?(path: string): Promise<void>;
   output: OutputSink;
   worktreeStore: {
+    getRelatedRepositories(): RelatedRepository[];
     getWorktrees(): ArashiWorktree[];
     refresh(config: ResolvedExtensionConfig): Promise<WorktreeRefreshResult>;
   };
@@ -98,6 +104,51 @@ function isWorktree(value: unknown): value is ArashiWorktree {
   );
 }
 
+function isRelatedRepository(value: unknown): value is RelatedRepository {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "path" in value &&
+      typeof (value as RelatedRepository).path === "string" &&
+      "name" in value &&
+      typeof (value as RelatedRepository).name === "string",
+  );
+}
+
+function extractWorktree(value: unknown): ArashiWorktree | undefined {
+  if (isWorktree(value)) {
+    return value;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "worktree" in value &&
+    isWorktree((value as { worktree?: unknown }).worktree)
+  ) {
+    return (value as { worktree: ArashiWorktree }).worktree;
+  }
+
+  return undefined;
+}
+
+function extractRelatedRepository(value: unknown): RelatedRepository | undefined {
+  if (isRelatedRepository(value)) {
+    return value;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "repository" in value &&
+    isRelatedRepository((value as { repository?: unknown }).repository)
+  ) {
+    return (value as { repository: RelatedRepository }).repository;
+  }
+
+  return undefined;
+}
+
 async function safeNotify(task: PromiseLike<void> | void): Promise<void> {
   await Promise.resolve(task);
 }
@@ -105,6 +156,11 @@ async function safeNotify(task: PromiseLike<void> | void): Promise<void> {
 export function createCommandHandlers(deps: CommandHandlerDependencies): HandlerMap {
   const discoverMissingRepositories =
     deps.discoverMissingRepositories ?? defaultDiscoverMissingRepositories;
+  const openFolder =
+    deps.openFolder ??
+    (async () => {
+      throw new Error("Folder opening is not configured for this extension host.");
+    });
 
   const executeWithLogging = async (
     command: string,
@@ -168,8 +224,9 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     inputCandidate: unknown,
     selectionTitle: string,
   ): Promise<ArashiWorktree | undefined> => {
-    if (isWorktree(inputCandidate)) {
-      return inputCandidate;
+    const selectedCandidate = extractWorktree(inputCandidate);
+    if (selectedCandidate) {
+      return selectedCandidate;
     }
 
     let worktrees = deps.worktreeStore.getWorktrees();
@@ -204,6 +261,71 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     }
 
     return choice.value;
+  };
+
+  const getSelectedRepository = async (
+    inputCandidate: unknown,
+    selectionTitle: string,
+  ): Promise<RelatedRepository | undefined> => {
+    const selectedCandidate = extractRelatedRepository(inputCandidate);
+    if (selectedCandidate) {
+      return selectedCandidate;
+    }
+
+    let repositories = deps.worktreeStore.getRelatedRepositories();
+    if (repositories.length === 0) {
+      await deps.worktreeStore.refresh(deps.getConfig());
+      repositories = deps.worktreeStore.getRelatedRepositories();
+    }
+
+    if (repositories.length === 0) {
+      await safeNotify(deps.notifications.warn("No related repositories are available."));
+      return undefined;
+    }
+
+    const choice = await deps.notifications.pick(
+      repositories.map((repository) => ({
+        label: repository.name,
+        description:
+          repository.relationship === "current"
+            ? "Current repo"
+            : repository.relationship === "parent"
+              ? "Parent repo"
+              : "Child repo",
+        detail: repository.path,
+        value: repository,
+      })),
+      {
+        title: selectionTitle,
+        placeHolder: "Select a repository",
+      },
+    );
+
+    if (!choice) {
+      await safeNotify(deps.notifications.info("Open repository cancelled."));
+      return undefined;
+    }
+
+    return choice.value;
+  };
+
+  const openRepository = async (repository: RelatedRepository): Promise<void> => {
+    if (!(await pathExists(repository.path))) {
+      await safeNotify(
+        deps.notifications.error(
+          `Open repository failed: ${repository.path} is missing or inaccessible.`,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await openFolder(repository.path);
+      await safeNotify(deps.notifications.success(`Opened ${repository.name}.`));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      await safeNotify(deps.notifications.error(`Open repository failed: ${message}`));
+    }
   };
 
   const runAddFlow = async (refreshAfterSuccess: boolean): Promise<void> => {
@@ -248,15 +370,15 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       return;
     }
 
+    if (refreshAfterSuccess) {
+      await refreshPanelState();
+    }
+
     await safeNotify(
       deps.notifications.success(
         `Added repository${parsed.data.repository?.name ? ` ${parsed.data.repository.name}` : ""}.`,
       ),
     );
-
-    if (refreshAfterSuccess) {
-      await refreshPanelState();
-    }
   };
 
   const runCloneFlow = async (refreshAfterSuccess: boolean): Promise<void> => {
@@ -299,10 +421,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      await safeNotify(deps.notifications.success("Cloned all missing repositories."));
       if (refreshAfterSuccess) {
         await refreshPanelState();
       }
+      await safeNotify(deps.notifications.success("Cloned all missing repositories."));
       return;
     }
 
@@ -342,10 +464,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       return;
     }
 
-    await safeNotify(deps.notifications.success(`Cloned ${selectedRepository.value.name}.`));
     if (refreshAfterSuccess) {
       await refreshPanelState();
     }
+    await safeNotify(deps.notifications.success(`Cloned ${selectedRepository.value.name}.`));
   };
 
   const runCommandWithFeedback = async (
@@ -363,10 +485,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       return;
     }
 
-    await safeNotify(deps.notifications.success(input.successMessage));
     if (input.refreshAfterSuccess) {
       await refreshPanelState();
     }
+    await safeNotify(deps.notifications.success(input.successMessage));
   };
 
   return {
@@ -441,8 +563,29 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      await safeNotify(deps.notifications.success("Worktree created."));
       await refreshPanelState();
+      await safeNotify(deps.notifications.success("Worktree created."));
+    },
+
+    [COMMAND_IDS.openWorkspaceRoot]: async () => {
+      const repositories = deps.worktreeStore.getRelatedRepositories();
+      const workspaceRoot = repositories.find((repository) => repository.kind === "workspace-root");
+      const selected =
+        workspaceRoot ?? (await getSelectedRepository(undefined, "Open Workspace Root"));
+      if (!selected) {
+        return;
+      }
+
+      await openRepository(selected);
+    },
+
+    [COMMAND_IDS.openRepository]: async () => {
+      const selected = await getSelectedRepository(undefined, "Open Related Repository");
+      if (!selected) {
+        return;
+      }
+
+      await openRepository(selected);
     },
 
     [COMMAND_IDS.pull]: async () => {
@@ -478,8 +621,8 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      await safeNotify(deps.notifications.success("Switched worktree."));
       await refreshPanelState();
+      await safeNotify(deps.notifications.success("Switched worktree."));
     },
 
     [COMMAND_IDS.remove]: async () => {
@@ -508,13 +651,22 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      await safeNotify(deps.notifications.success("Worktree removed."));
       await refreshPanelState();
+      await safeNotify(deps.notifications.success("Worktree removed."));
     },
 
     [COMMAND_IDS.panelRefresh]: async () => {
       await refreshPanelState();
       await safeNotify(deps.notifications.success("Worktree panel refreshed."));
+    },
+
+    [COMMAND_IDS.panelOpenRepo]: async (repository: unknown) => {
+      const selected = await getSelectedRepository(repository, "Open Repository");
+      if (!selected) {
+        return;
+      }
+
+      await openRepository(selected);
     },
 
     [COMMAND_IDS.panelSwitch]: async (worktree: unknown) => {
@@ -532,8 +684,8 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      await safeNotify(deps.notifications.success(`Switched to ${selected.repo}.`));
       await refreshPanelState();
+      await safeNotify(deps.notifications.success(`Switched to ${selected.repo}.`));
     },
 
     [COMMAND_IDS.panelRemove]: async (worktree: unknown) => {
@@ -562,8 +714,8 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      await safeNotify(deps.notifications.success(`Removed ${selected.repo}.`));
       await refreshPanelState();
+      await safeNotify(deps.notifications.success(`Removed ${selected.repo}.`));
     },
 
     [COMMAND_IDS.panelAddRepo]: async () => {

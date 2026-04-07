@@ -1,3 +1,11 @@
+import type { RelatedRepository } from "../workspace/context";
+
+export interface ArashiSubRepository {
+  relativePath: string;
+  branch: string | null;
+  hasChanges: boolean;
+}
+
 export interface ArashiWorktree {
   repo: string;
   branch: string | null;
@@ -7,6 +15,7 @@ export interface ArashiWorktree {
   status: "clean" | "modified";
   isMain: boolean;
   locked: boolean;
+  subRepositories: ArashiSubRepository[];
 }
 
 export type WorktreeFetchErrorKind = "command_failure" | "parse_error" | "invalid_workspace";
@@ -24,6 +33,7 @@ export type WorktreeListResult =
     };
 
 export interface WorktreeStoreState {
+  relatedRepositories: RelatedRepository[];
   worktrees: ArashiWorktree[];
   banner?: {
     kind: "empty" | "warning" | "error";
@@ -42,3 +52,5 @@ export type WorktreeRefreshResult =
       reason: WorktreeFetchErrorKind;
       preservedLastKnown: boolean;
     };
+
+export type { RelatedRepository };

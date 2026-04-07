@@ -1,6 +1,6 @@
-import { access, readFile, readdir, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { normalizeCommandFailure, type CommandExecutor, type CommandFailure } from "./cli/runner";
+import { resolveArashiWorkspaceRoot } from "./workspace/context";
 
 export interface WorkspaceFolderLike {
   uri: {
@@ -31,8 +31,6 @@ export interface StartupValidationResult {
   error?: string;
   warnings: string[];
 }
-
-const ROOT_PATH = "/";
 
 export function resolveExtensionConfig(
   settings: SettingsReader,
@@ -100,7 +98,7 @@ export async function validateStartup(
   }
 
   const warnings: string[] = [];
-  const workspaceConfigRoot = await findWorkspaceConfigRoot(config.workspaceRoot);
+  const workspaceConfigRoot = await resolveArashiWorkspaceRoot(config.workspaceRoot);
   if (!workspaceConfigRoot) {
     warnings.push(
       `No Arashi workspace config found for ${config.workspaceRoot}. Run \"Arashi: Init Workspace\" if this workspace is not initialized yet.`,
@@ -111,113 +109,4 @@ export async function validateStartup(
     ok: true,
     warnings,
   };
-}
-
-async function findWorkspaceConfigRoot(startPath: string): Promise<string | null> {
-  let currentPath = resolve(startPath);
-
-  while (true) {
-    if (await hasArashiConfig(currentPath)) {
-      return currentPath;
-    }
-
-    const siblingConfigRoot = await findSiblingWorkspaceConfigRoot(currentPath);
-    if (siblingConfigRoot) {
-      return siblingConfigRoot;
-    }
-
-    if (currentPath === ROOT_PATH) {
-      return null;
-    }
-
-    const parentPath = dirname(currentPath);
-    if (parentPath === currentPath) {
-      return null;
-    }
-    currentPath = parentPath;
-  }
-}
-
-async function hasArashiConfig(candidateRoot: string): Promise<boolean> {
-  try {
-    await access(join(candidateRoot, ".arashi", "config.json"));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function findSiblingWorkspaceConfigRoot(candidateRoot: string): Promise<string | null> {
-  const commonGitDir = await resolveCommonGitDir(candidateRoot);
-  if (!commonGitDir) {
-    return null;
-  }
-
-  const siblingRoots = await resolveSiblingWorktreeRoots(commonGitDir);
-  for (const root of siblingRoots) {
-    if (await hasArashiConfig(root)) {
-      return root;
-    }
-  }
-
-  return null;
-}
-
-async function resolveCommonGitDir(candidateRoot: string): Promise<string | null> {
-  const gitEntryPath = join(candidateRoot, ".git");
-
-  try {
-    const gitEntry = await stat(gitEntryPath);
-    if (gitEntry.isDirectory()) {
-      return gitEntryPath;
-    }
-
-    if (!gitEntry.isFile()) {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-
-  try {
-    const gitDirContent = await readFile(gitEntryPath, "utf8");
-    const prefix = "gitdir:";
-    if (!gitDirContent.startsWith(prefix)) {
-      return null;
-    }
-
-    const gitDir = resolve(candidateRoot, gitDirContent.slice(prefix.length).trim());
-    const commonDirPath = join(gitDir, "commondir");
-
-    try {
-      const commonDirContent = await readFile(commonDirPath, "utf8");
-      return resolve(gitDir, commonDirContent.trim());
-    } catch {
-      return dirname(gitDir);
-    }
-  } catch {
-    return null;
-  }
-}
-
-async function resolveSiblingWorktreeRoots(commonGitDir: string): Promise<string[]> {
-  const roots = new Set<string>([resolve(commonGitDir, "..")] );
-  const worktreesDir = join(commonGitDir, "worktrees");
-
-  try {
-    const entries = await readdir(worktreesDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-
-      const gitdirFile = join(worktreesDir, entry.name, "gitdir");
-      try {
-        const linkedGitFile = resolve(worktreesDir, entry.name, (await readFile(gitdirFile, "utf8")).trim());
-        roots.add(dirname(linkedGitFile));
-      } catch {}
-    }
-  } catch {}
-
-  return [...roots];
 }

@@ -5,10 +5,35 @@ Manage Arashi worktrees directly from VS Code.
 ## Features
 
 - Run core Arashi commands from the command palette: `init`, `add`, `clone`, `create`, `pull`, `sync`, `switch`, `remove`
-- Browse worktrees in the **Arashi Worktrees** panel with repo, branch, path, and change status
-- Trigger contextual panel actions for switch, remove, and add repository
+- Open the workspace root or a related repository in a new VS Code window from command-palette or panel flows
+- Browse worktrees in the **Arashi Worktrees** panel grouped by repository with repo, branch, path, and change status
+- Trigger contextual panel actions for switching, removing, refreshing, creating, and opening related repositories
 - Capture command context and diagnostics in the **Arashi** output channel
 - Use `arashi clone` from the integrated terminal to recover missing configured repositories
+
+## Find the Panel
+
+The extension UI lives in the Explorer sidebar as **Arashi Worktrees**.
+
+1. Open the Explorer view in VS Code.
+2. Look for the **Arashi Worktrees** section below your normal file tree.
+3. If it is collapsed, expand it.
+4. If it is hidden, open the Explorer view menu and re-enable **Arashi Worktrees**.
+
+The panel appears after the extension activates for the current workspace. If you work from a child repo, set `arashi.workspaceRoot` when you want commands to execute against a different Arashi root.
+
+## Panel Workflow
+
+Use this quick walkthrough when the panel is visible:
+
+1. Use the title-bar `+` action to run `Arashi: Create Worktree`.
+2. Use the title-bar refresh action after external terminal changes, or simply refocus the editor to let the panel refresh itself.
+3. Expand a repository node to inspect the worktrees associated with that repo.
+4. Select the inline arrow action on a worktree to switch to that exact worktree.
+5. Select the inline trash action on a worktree to remove it with a single confirmation.
+6. Use the repository context action or `Arashi: Open Related Repository` to open a repo-focused VS Code window.
+
+This README uses structured guidance instead of screenshots so the onboarding text stays accurate across Marketplace and editor variants.
 
 ## Requirements
 

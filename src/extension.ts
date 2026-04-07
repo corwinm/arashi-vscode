@@ -91,6 +91,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getConfig,
     execute: (request) => runArashiCommand(request),
     notifications,
+    openFolder: async (path) => {
+      await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(path), {
+        forceNewWindow: true,
+      });
+    },
     output,
     worktreeStore,
     refreshWorktreePanel: (config) => treeProvider.refresh(config),
@@ -121,6 +126,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   });
   context.subscriptions.push(configSubscription);
+
+  const visibilitySubscription = treeView.onDidChangeVisibility((event) => {
+    if (event.visible) {
+      void treeProvider.refresh(getConfig());
+    }
+  });
+  context.subscriptions.push(visibilitySubscription);
+
+  const focusSubscription = vscode.window.onDidChangeWindowState((state) => {
+    if (state.focused && treeView.visible) {
+      void treeProvider.refresh(getConfig());
+    }
+  });
+  context.subscriptions.push(focusSubscription);
 }
 
 export function deactivate(): void {}

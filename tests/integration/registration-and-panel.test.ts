@@ -1,9 +1,12 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createCommandHandlers } from "../../src/commands/handlers";
 import { registerCommandHandlers } from "../../src/commands/registry";
 import { COMMAND_IDS } from "../../src/constants";
 import { WorktreeStore } from "../../src/worktrees/store";
-import type { ArashiWorktree } from "../../src/worktrees/types";
+import type { ArashiWorktree, RelatedRepository } from "../../src/worktrees/types";
 
 const config = {
   binaryPath: "arashi",
@@ -14,18 +17,50 @@ const config = {
 
 function sampleWorktree(): ArashiWorktree {
   return {
-    repo: "app",
+    repo: "workspace-main",
     branch: "feature/test",
-    path: "/tmp/workspace/repos/app/.worktrees/feature-test",
+    path: "/tmp/workspace-feature-test",
     relationship: "current",
     hasChanges: false,
     status: "clean",
     isMain: false,
     locked: false,
+    subRepositories: [
+      {
+        relativePath: "repos/app",
+        branch: "feature/test",
+        hasChanges: false,
+      },
+    ],
   };
 }
 
+function sampleRepositories(rootPath = "/tmp/workspace"): RelatedRepository[] {
+  return [
+    {
+      name: "workspace-main",
+      path: rootPath,
+      relativePath: ".",
+      kind: "workspace-root",
+      relationship: "parent",
+    },
+    {
+      name: "app",
+      path: join(rootPath, "repos", "app"),
+      relativePath: "repos/app",
+      kind: "child-repo",
+      relationship: "current",
+    },
+  ];
+}
+
 describe("integration: command registration and panel flows", () => {
+  const cleanupPaths: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(cleanupPaths.splice(0).map((path) => rm(path, { force: true, recursive: true })));
+  });
+
   test("registers all command handlers", () => {
     const handlers = createCommandHandlers({
       getConfig: () => config,
@@ -50,8 +85,9 @@ describe("integration: command registration and panel flows", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [],
-        refresh: async () => ({ ok: true, state: { worktrees: [] } }),
+        refresh: async () => ({ ok: true, state: { relatedRepositories: [], worktrees: [] } }),
       },
     });
 
@@ -85,6 +121,7 @@ describe("integration: command registration and panel flows", () => {
     ];
 
     const store = new WorktreeStore({
+      listRelatedRepositories: async () => [],
       listWorktrees: async () => {
         const next = responses.shift();
         if (!next) {
@@ -109,7 +146,13 @@ describe("integration: command registration and panel flows", () => {
 
   test("switch passes the host IDE override, remove requires confirmation, and actions refresh panel", async () => {
     const worktree = sampleWorktree();
+    const sandbox = await mkdtemp(join(tmpdir(), "arashi-vscode-panel-"));
+    cleanupPaths.push(sandbox);
+    const repositories = sampleRepositories(sandbox);
+    await mkdir(repositories[0].path, { recursive: true });
+    await mkdir(repositories[1].path, { recursive: true });
     const executedCommands: Array<{ command: string; args?: string[] }> = [];
+    const openedFolders: string[] = [];
     let panelRefreshCount = 0;
     let storeRefreshCount = 0;
     let confirmCount = 0;
@@ -143,13 +186,18 @@ describe("integration: command registration and panel flows", () => {
       output: {
         appendLine: () => {},
       },
+      openFolder: async (path) => {
+        openedFolders.push(path);
+      },
       worktreeStore: {
+        getRelatedRepositories: () => repositories,
         getWorktrees: () => [worktree],
         refresh: async () => {
           storeRefreshCount += 1;
           return {
             ok: true,
             state: {
+              relatedRepositories: repositories,
               worktrees: [worktree],
             },
           };
@@ -160,13 +208,14 @@ describe("integration: command registration and panel flows", () => {
         return {
           ok: true,
           state: {
+            relatedRepositories: repositories,
             worktrees: [worktree],
           },
         };
       },
     });
 
-    await handlers[COMMAND_IDS.panelSwitch](worktree);
+    await handlers[COMMAND_IDS.panelSwitch]({ worktree });
     expect(executedCommands).toContainEqual({
       command: "switch",
       args: [worktree.path, "--path", "--vscode"],
@@ -174,18 +223,21 @@ describe("integration: command registration and panel flows", () => {
     expect(confirmCount).toBe(0);
 
     confirmValue = false;
-    await handlers[COMMAND_IDS.panelRemove](worktree);
+    await handlers[COMMAND_IDS.panelRemove]({ worktree });
     expect(
       executedCommands.filter((request) => request.command === "remove"),
     ).toHaveLength(0);
     expect(confirmCount).toBe(1);
 
     confirmValue = true;
-    await handlers[COMMAND_IDS.panelRemove](worktree);
+    await handlers[COMMAND_IDS.panelRemove]({ worktree });
     expect(
       executedCommands.filter((request) => request.command === "remove"),
     ).toHaveLength(1);
     expect(confirmCount).toBe(2);
+
+    await handlers[COMMAND_IDS.panelOpenRepo]({ repository: repositories[1] });
+    expect(openedFolders).toEqual([repositories[1].path]);
 
     await handlers[COMMAND_IDS.panelAddRepo]();
     expect(executedCommands.filter((request) => request.command === "add")).toHaveLength(1);
@@ -200,9 +252,9 @@ describe("integration: command registration and panel flows", () => {
     const initial = sampleWorktree();
     const next = {
       ...sampleWorktree(),
-      repo: "docs",
+      repo: "workspace-feature-next",
       branch: "feature/next",
-      path: "/tmp/workspace/repos/docs/.worktrees/feature-next",
+      path: "/tmp/workspace-feature-next",
       relationship: "sibling" as const,
     };
     const responses = [
@@ -216,6 +268,7 @@ describe("integration: command registration and panel flows", () => {
       },
     ];
     const store = new WorktreeStore({
+      listRelatedRepositories: async () => [],
       listWorktrees: async () => {
         const response = responses.shift();
         if (!response) {
@@ -260,6 +313,7 @@ describe("integration: command registration and panel flows", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => store.getWorktrees(),
         refresh: async (refreshConfig) => store.refresh(refreshConfig),
       },
@@ -278,8 +332,8 @@ describe("integration: command registration and panel flows", () => {
     primary.branch = "main";
     const duplicate = {
       ...sampleWorktree(),
-      repo: "docs",
-      path: "/tmp/workspace/repos/docs/.worktrees/main",
+      repo: "workspace-main-copy",
+      path: "/tmp/workspace-main-copy",
       branch: "main",
     };
     const notifications = {
@@ -312,10 +366,12 @@ describe("integration: command registration and panel flows", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [primary, duplicate],
         refresh: async () => ({
           ok: true,
           state: {
+            relatedRepositories: [],
             worktrees: [primary, duplicate],
           },
         }),
@@ -328,5 +384,56 @@ describe("integration: command registration and panel flows", () => {
       command: "switch",
       args: [duplicate.path, "--path", "--vscode"],
     });
+  });
+
+  test("command palette repository navigation reuses the repo-opening flow", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "arashi-vscode-panel-open-"));
+    cleanupPaths.push(sandbox);
+    const repositories = sampleRepositories(sandbox);
+    await mkdir(repositories[0].path, { recursive: true });
+    await mkdir(repositories[1].path, { recursive: true });
+    const openedFolders: string[] = [];
+
+    const handlers = createCommandHandlers({
+      getConfig: () => config,
+      execute: async () => ({
+        ok: true,
+        commandLine: "arashi list --json",
+        stdout: "",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 1,
+      }),
+      notifications: {
+        input: async () => "",
+        pick: async (items) => items.find((item) => item.value === repositories[1]),
+        confirm: async () => false,
+        info: async () => {},
+        warn: async () => {},
+        error: async () => {},
+        success: async () => {},
+      },
+      openFolder: async (path) => {
+        openedFolders.push(path);
+      },
+      output: {
+        appendLine: () => {},
+      },
+      worktreeStore: {
+        getRelatedRepositories: () => repositories,
+        getWorktrees: () => [],
+        refresh: async () => ({
+          ok: true,
+          state: {
+            relatedRepositories: repositories,
+            worktrees: [],
+          },
+        }),
+      },
+    });
+
+    await handlers[COMMAND_IDS.openRepository]();
+
+    expect(openedFolders).toEqual([repositories[1].path]);
   });
 });

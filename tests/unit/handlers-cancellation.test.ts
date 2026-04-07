@@ -40,10 +40,12 @@ describe("handlers cancellation paths", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [],
         refresh: async () => ({
           ok: true,
           state: {
+            relatedRepositories: [],
             worktrees: [],
           },
         }),
@@ -92,12 +94,14 @@ describe("handlers cancellation paths", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [],
         refresh: async () => {
           storeRefreshCount += 1;
           return {
             ok: true,
             state: {
+              relatedRepositories: [],
               worktrees: [],
             },
           };
@@ -108,6 +112,7 @@ describe("handlers cancellation paths", () => {
         return {
           ok: true,
           state: {
+            relatedRepositories: [],
             worktrees: [],
           },
         };
@@ -157,10 +162,12 @@ describe("handlers cancellation paths", () => {
         show: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [],
         refresh: async () => ({
           ok: true,
           state: {
+            relatedRepositories: [],
             worktrees: [],
           },
         }),
@@ -221,12 +228,14 @@ describe("handlers cancellation paths", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [],
         refresh: async () => {
           refreshCount += 1;
           return {
             ok: true,
             state: {
+              relatedRepositories: [],
               worktrees: [],
             },
           };
@@ -310,10 +319,12 @@ describe("handlers cancellation paths", () => {
         appendLine: () => {},
       },
       worktreeStore: {
+        getRelatedRepositories: () => [],
         getWorktrees: () => [],
         refresh: async () => ({
           ok: true,
           state: {
+            relatedRepositories: [],
             worktrees: [],
           },
         }),
