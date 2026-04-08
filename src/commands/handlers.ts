@@ -62,10 +62,13 @@ export interface Notifications {
   success(message: string): PromiseLike<void> | void;
 }
 
+type ProgressRunner = <T>(title: string, task: () => Promise<T>) => Promise<T>;
+
 export interface CommandHandlerDependencies {
   getConfig(): ResolvedExtensionConfig;
   execute: CommandExecutor;
   notifications: Notifications;
+  runWithProgress?: ProgressRunner;
   openFolder?(path: string): Promise<void>;
   output: OutputSink;
   worktreeStore: {
@@ -161,6 +164,8 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     (async () => {
       throw new Error("Folder opening is not configured for this extension host.");
     });
+  const runWithProgress: ProgressRunner =
+    deps.runWithProgress ?? (async (_title, task) => task());
 
   const executeWithLogging = async (
     command: string,
@@ -218,6 +223,30 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     if (!refreshResult.ok && refreshResult.state.banner) {
       await safeNotify(deps.notifications.warn(refreshResult.state.banner.message));
     }
+  };
+
+  const removeSelectedWorktree = async (
+    selected: ArashiWorktree,
+    prompt: ConfirmPrompt,
+    successMessage: string,
+  ): Promise<void> => {
+    const confirmed = await deps.notifications.confirm(prompt);
+
+    if (!confirmed) {
+      await safeNotify(deps.notifications.info("Remove worktree cancelled."));
+      return;
+    }
+
+    const result = await runWithProgress("Removing worktree...", () =>
+      executeWithLogging("remove", buildRemoveArgs({ target: selected.path, pathMode: true })),
+    );
+    if (!result.ok) {
+      await handleFailure("Remove worktree", result);
+      return;
+    }
+
+    await refreshPanelState();
+    await safeNotify(deps.notifications.success(successMessage));
   };
 
   const getSelectedWorktree = async (
@@ -340,9 +369,13 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       return;
     }
 
-    const result = await executeWithLogging("add", buildAddArgs({ gitUrl: gitUrl.value }), {
-      enforceJson: true,
-    });
+    const gitUrlValue = gitUrl.value;
+
+    const result = await runWithProgress("Adding repository...", () =>
+      executeWithLogging("add", buildAddArgs({ gitUrl: gitUrlValue }), {
+        enforceJson: true,
+      }),
+    );
 
     if (!result.ok) {
       await handleFailure("Add repository", result);
@@ -415,7 +448,9 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     }
 
     if (mode.value === "all") {
-      const result = await executeWithLogging("clone", buildCloneArgs({ all: true }));
+      const result = await runWithProgress("Cloning repositories...", () =>
+        executeWithLogging("clone", buildCloneArgs({ all: true })),
+      );
       if (!result.ok) {
         await handleFailure("Clone repositories", result);
         return;
@@ -455,10 +490,16 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       return;
     }
 
-    const result = await executeBinaryWithLogging("git", "clone", [
-      selectedRepository.value.gitUrl,
-      selectedRepository.value.path,
-    ]);
+    const selectedRepositoryGitUrl = selectedRepository.value.gitUrl;
+
+    const result = await runWithProgress(
+      `Cloning ${selectedRepository.value.name}...`,
+      () =>
+        executeBinaryWithLogging("git", "clone", [
+          selectedRepositoryGitUrl,
+          selectedRepository.value.path,
+        ]),
+    );
     if (!result.ok) {
       await handleFailure(`Clone repository ${selectedRepository.value.name}`, result);
       return;
@@ -475,11 +516,14 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       command: string;
       args?: string[];
       actionLabel: string;
+      progressTitle: string;
       successMessage: string;
       refreshAfterSuccess?: boolean;
     },
   ): Promise<void> => {
-    const result = await executeWithLogging(input.command, input.args ?? []);
+    const result = await runWithProgress(input.progressTitle, () =>
+      executeWithLogging(input.command, input.args ?? []),
+    );
     if (!result.ok) {
       await handleFailure(input.actionLabel, result);
       return;
@@ -520,12 +564,14 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const result = await executeWithLogging(
-        "init",
-        buildInitArgs({
-          reposDir,
-          skipDiscovery: discoverChoice.value,
-        }),
+      const result = await runWithProgress("Initializing Arashi workspace...", () =>
+        executeWithLogging(
+          "init",
+          buildInitArgs({
+            reposDir,
+            skipDiscovery: discoverChoice.value,
+          }),
+        ),
       );
 
       if (!result.ok) {
@@ -557,7 +603,11 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const result = await executeWithLogging("create", buildCreateArgs(branch.value));
+      const branchValue = branch.value;
+
+      const result = await runWithProgress("Creating worktree...", () =>
+        executeWithLogging("create", buildCreateArgs(branchValue)),
+      );
       if (!result.ok) {
         await handleFailure("Create worktree", result);
         return;
@@ -592,6 +642,7 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       await runCommandWithFeedback({
         command: "pull",
         actionLabel: "Pull worktrees",
+        progressTitle: "Pulling worktrees...",
         successMessage: "Pulled worktrees.",
         refreshAfterSuccess: true,
       });
@@ -601,6 +652,7 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       await runCommandWithFeedback({
         command: "sync",
         actionLabel: "Sync worktrees",
+        progressTitle: "Syncing worktrees...",
         successMessage: "Synced worktrees.",
         refreshAfterSuccess: true,
       });
@@ -612,9 +664,8 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const result = await executeWithLogging(
-        "switch",
-        buildSwitchArgs(selected.path, deps.getConfig().editorHost),
+      const result = await runWithProgress("Switching worktree...", () =>
+        executeWithLogging("switch", buildSwitchArgs(selected.path, deps.getConfig().editorHost)),
       );
       if (!result.ok) {
         await handleFailure("Switch worktree", result);
@@ -631,28 +682,15 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const confirmed = await deps.notifications.confirm({
+      await removeSelectedWorktree(
+        selected,
+        {
         title: "Confirm worktree removal",
         message: `Remove worktree ${selected.path}?`,
         detail: "This action is destructive.",
-      });
-
-      if (!confirmed) {
-        await safeNotify(deps.notifications.info("Remove worktree cancelled."));
-        return;
-      }
-
-      const result = await executeWithLogging(
-        "remove",
-        buildRemoveArgs({ target: selected.path, pathMode: true }),
+        },
+        "Worktree removed.",
       );
-      if (!result.ok) {
-        await handleFailure("Remove worktree", result);
-        return;
-      }
-
-      await refreshPanelState();
-      await safeNotify(deps.notifications.success("Worktree removed."));
     },
 
     [COMMAND_IDS.panelRefresh]: async () => {
@@ -675,9 +713,8 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const result = await executeWithLogging(
-        "switch",
-        buildSwitchArgs(selected.path, deps.getConfig().editorHost),
+      const result = await runWithProgress("Switching worktree...", () =>
+        executeWithLogging("switch", buildSwitchArgs(selected.path, deps.getConfig().editorHost)),
       );
       if (!result.ok) {
         await handleFailure("Switch worktree", result);
@@ -694,28 +731,15 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         return;
       }
 
-      const confirmed = await deps.notifications.confirm({
+      await removeSelectedWorktree(
+        selected,
+        {
         title: "Confirm worktree removal",
         message: `Remove ${selected.path}?`,
         detail: "This action permanently removes the selected worktree.",
-      });
-
-      if (!confirmed) {
-        await safeNotify(deps.notifications.info("Remove worktree cancelled."));
-        return;
-      }
-
-      const result = await executeWithLogging(
-        "remove",
-        buildRemoveArgs({ target: selected.path, pathMode: true }),
+        },
+        `Removed ${selected.repo}.`,
       );
-      if (!result.ok) {
-        await handleFailure("Remove worktree", result);
-        return;
-      }
-
-      await refreshPanelState();
-      await safeNotify(deps.notifications.success(`Removed ${selected.repo}.`));
     },
 
     [COMMAND_IDS.panelAddRepo]: async () => {

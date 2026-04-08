@@ -48,6 +48,19 @@ function createNotificationsAdapter(): Notifications {
   };
 }
 
+function runWithProgress<T>(title: string, task: () => Promise<T>): Promise<T> {
+  return Promise.resolve(
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title,
+        cancellable: false,
+      },
+      () => task(),
+    ),
+  );
+}
+
 function workspaceFoldersAsLike(
   folders: readonly vscode.WorkspaceFolder[] | undefined,
 ): readonly WorkspaceFolderLike[] | undefined {
@@ -91,6 +104,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getConfig,
     execute: (request) => runArashiCommand(request),
     notifications,
+    runWithProgress,
     openFolder: async (path) => {
       await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(path), {
         forceNewWindow: true,
