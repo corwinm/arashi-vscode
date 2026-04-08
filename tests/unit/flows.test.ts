@@ -30,6 +30,7 @@ describe("command flow helpers", () => {
     expect(buildRemoveArgs({ target: "/tmp/worktree", pathMode: true })).toEqual([
       "/tmp/worktree",
       "--path",
+      "--force",
     ]);
   });
 

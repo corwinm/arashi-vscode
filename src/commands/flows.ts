@@ -68,6 +68,7 @@ export function buildRemoveArgs(input: { target: string; pathMode: boolean }): s
   if (input.pathMode) {
     args.push("--path");
   }
+  args.push("--force");
   return args;
 }
 

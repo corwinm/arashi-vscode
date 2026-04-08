@@ -153,6 +153,7 @@ describe("integration: command registration and panel flows", () => {
     await mkdir(repositories[1].path, { recursive: true });
     const executedCommands: Array<{ command: string; args?: string[] }> = [];
     const openedFolders: string[] = [];
+    const progressTitles: string[] = [];
     let panelRefreshCount = 0;
     let storeRefreshCount = 0;
     let confirmCount = 0;
@@ -182,6 +183,10 @@ describe("integration: command registration and panel flows", () => {
         warn: async () => {},
         error: async () => {},
         success: async () => {},
+      },
+      runWithProgress: async (title, task) => {
+        progressTitles.push(title);
+        return task();
       },
       output: {
         appendLine: () => {},
@@ -231,9 +236,12 @@ describe("integration: command registration and panel flows", () => {
 
     confirmValue = true;
     await handlers[COMMAND_IDS.panelRemove]({ worktree });
-    expect(
-      executedCommands.filter((request) => request.command === "remove"),
-    ).toHaveLength(1);
+    expect(executedCommands.filter((request) => request.command === "remove")).toEqual([
+      {
+        command: "remove",
+        args: [worktree.path, "--path", "--force"],
+      },
+    ]);
     expect(confirmCount).toBe(2);
 
     await handlers[COMMAND_IDS.panelOpenRepo]({ repository: repositories[1] });
@@ -246,6 +254,11 @@ describe("integration: command registration and panel flows", () => {
 
     expect(panelRefreshCount).toBe(4);
     expect(storeRefreshCount).toBe(0);
+    expect(progressTitles).toEqual([
+      "Switching worktree...",
+      "Removing worktree...",
+      "Adding repository...",
+    ]);
   });
 
   test("manual refresh replaces rendered entries when discovery changes", async () => {
@@ -347,6 +360,7 @@ describe("integration: command registration and panel flows", () => {
       success: async () => {},
     };
     const executedCommands: Array<{ command: string; args?: string[] }> = [];
+    const progressTitles: string[] = [];
 
     const handlers = createCommandHandlers({
       getConfig: () => config,
@@ -362,6 +376,10 @@ describe("integration: command registration and panel flows", () => {
         };
       },
       notifications,
+      runWithProgress: async (title, task) => {
+        progressTitles.push(title);
+        return task();
+      },
       output: {
         appendLine: () => {},
       },
@@ -384,6 +402,71 @@ describe("integration: command registration and panel flows", () => {
       command: "switch",
       args: [duplicate.path, "--path", "--vscode"],
     });
+    expect(progressTitles).toEqual(["Switching worktree..."]);
+  });
+
+  test("command palette remove uses forced exact path mode", async () => {
+    const primary = sampleWorktree();
+    primary.branch = "main";
+    const duplicate = {
+      ...sampleWorktree(),
+      repo: "workspace-main-copy",
+      path: "/tmp/workspace-main-copy",
+      branch: "main",
+    };
+    const executedCommands: Array<{ command: string; args?: string[] }> = [];
+    const progressTitles: string[] = [];
+
+    const handlers = createCommandHandlers({
+      getConfig: () => config,
+      execute: async (request) => {
+        executedCommands.push({ command: request.command, args: request.args });
+        return {
+          ok: true,
+          commandLine: `arashi ${request.command}`,
+          stdout: "",
+          stderr: "",
+          exitCode: 0,
+          durationMs: 1,
+        };
+      },
+      notifications: {
+        input: async () => "",
+        pick: async <T,>(items: Array<{ label: string; value: T; description?: string; detail?: string }>) =>
+          items[1],
+        confirm: async () => true,
+        info: async () => {},
+        warn: async () => {},
+        error: async () => {},
+        success: async () => {},
+      },
+      runWithProgress: async (title, task) => {
+        progressTitles.push(title);
+        return task();
+      },
+      output: {
+        appendLine: () => {},
+      },
+      worktreeStore: {
+        getRelatedRepositories: () => [],
+        getWorktrees: () => [primary, duplicate],
+        refresh: async () => ({
+          ok: true,
+          state: {
+            relatedRepositories: [],
+            worktrees: [primary, duplicate],
+          },
+        }),
+      },
+    });
+
+    await handlers[COMMAND_IDS.remove]();
+
+    expect(executedCommands).toContainEqual({
+      command: "remove",
+      args: [duplicate.path, "--path", "--force"],
+    });
+    expect(progressTitles).toEqual(["Removing worktree..."]);
   });
 
   test("command palette repository navigation reuses the repo-opening flow", async () => {
