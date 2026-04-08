@@ -1,3 +1,13 @@
+## [1.3.0](https://github.com/corwinm/arashi-vscode/compare/v1.2.1...v1.3.0) (2026-04-08)
+
+### Features
+
+* improve repo-aware VS Code worktree panel ([#9](https://github.com/corwinm/arashi-vscode/issues/9)) ([4872e9c](https://github.com/corwinm/arashi-vscode/commit/4872e9c5f0e823a21b6b210f3b162884c36ab8fb))
+
+### Bug Fixes
+
+* refresh VS Code worktree panel UI ([#8](https://github.com/corwinm/arashi-vscode/issues/8)) ([c67bc53](https://github.com/corwinm/arashi-vscode/commit/c67bc53a95bfc7f9802ab25e52a2d6ddcd391ebe))
+
 ## [1.2.1](https://github.com/corwinm/arashi-vscode/compare/v1.2.0...v1.2.1) (2026-03-31)
 
 ### Bug Fixes
