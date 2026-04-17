@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildCloneArgs,
+  buildCreateArgs,
   buildInitArgs,
   buildRemoveArgs,
   buildSwitchArgs,
@@ -44,5 +45,17 @@ describe("command flow helpers", () => {
       "--path",
       "--cursor",
     ]);
+  });
+
+  test("builds create arguments with editor host context", () => {
+    expect(buildCreateArgs("feature/test", "vscode")).toEqual([
+      "feature/test",
+      "--editor-host",
+      "vscode",
+    ]);
+  });
+
+  test("omits editor host context for create when host is unknown", () => {
+    expect(buildCreateArgs("feature/test", null)).toEqual(["feature/test"]);
   });
 });

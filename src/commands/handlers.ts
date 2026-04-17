@@ -604,9 +604,10 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       }
 
       const branchValue = branch.value;
+      const config = deps.getConfig();
 
       const result = await runWithProgress("Creating worktree...", () =>
-        executeWithLogging("create", buildCreateArgs(branchValue)),
+        executeWithLogging("create", buildCreateArgs(branchValue, config.editorHost)),
       );
       if (!result.ok) {
         await handleFailure("Create worktree", result);
