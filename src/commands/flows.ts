@@ -50,8 +50,12 @@ export function buildCloneArgs(input: { all?: boolean } = {}): string[] {
   return args;
 }
 
-export function buildCreateArgs(branch: string): string[] {
-  return [branch.trim()];
+export function buildCreateArgs(branch: string, editorHost: EditorHost = null): string[] {
+  const args = [branch.trim()];
+  if (editorHost) {
+    args.push("--editor-host", editorHost);
+  }
+  return args;
 }
 
 export function buildSwitchArgs(target: string, editorHost: EditorHost = null): string[] {

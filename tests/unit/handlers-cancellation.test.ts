@@ -12,7 +12,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
-        editorHost: null,
+        editorHost: "vscode",
       }),
       execute: async (request) => {
         executedCommands.push(request.command);
@@ -69,7 +69,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
-        editorHost: null,
+        editorHost: "vscode",
       }),
       execute: async (request) => {
         executedCommands.push(request.command);
@@ -143,7 +143,7 @@ describe("handlers cancellation paths", () => {
         binaryPath: "arashi",
         workspaceRoot: "/tmp/workspace",
         commandTimeoutMs: 120000,
-        editorHost: null,
+        editorHost: "vscode",
       }),
       execute: async (request) => {
         executedRequests.push({ command: request.command, args: request.args });
@@ -199,7 +199,7 @@ describe("handlers cancellation paths", () => {
       },
       {
         command: "create",
-        args: ["feature/test"],
+        args: ["feature/test", "--editor-host", "vscode"],
       },
     ]);
   });
