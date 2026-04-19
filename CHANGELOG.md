@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/corwinm/arashi-vscode/compare/v1.3.0...v1.3.1) (2026-04-19)
+
+### Bug Fixes
+
+* make VS Code remove flows non-interactive ([#10](https://github.com/corwinm/arashi-vscode/issues/10)) ([b3bc53b](https://github.com/corwinm/arashi-vscode/commit/b3bc53babe2a1e56a6d9e4338fde5d9dd400aba4))
+* pass editor host to create invocations ([#11](https://github.com/corwinm/arashi-vscode/issues/11)) ([46a8b41](https://github.com/corwinm/arashi-vscode/commit/46a8b41c2322b7b78c0951a1bba7f450a1f869ef))
+
 ## [1.3.0](https://github.com/corwinm/arashi-vscode/compare/v1.2.1...v1.3.0) (2026-04-08)
 
 ### Features
