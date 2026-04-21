@@ -21,12 +21,12 @@ export function describeWorktree(
 }
 
 export function describeSubRepository(link: WorktreeRepositoryLink): string | undefined {
-  const labels = [
-    link.repository.relationship === "current" ? "current" : undefined,
-    link.hasChanges ? "modified" : undefined,
-  ].filter((value): value is string => Boolean(value));
+  const relationship = link.repository.relationship === "current" ? "current" : "child";
+  const labels = [relationship, link.hasChanges ? "modified" : undefined].filter(
+    (value): value is string => Boolean(value),
+  );
 
-  return labels.length > 0 ? labels.join(" · ") : undefined;
+  return labels.join(" · ");
 }
 
 function isTopLevelWorktree(
