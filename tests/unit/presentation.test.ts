@@ -161,5 +161,18 @@ describe("worktree presentation", () => {
         hasChanges: true,
       }),
     ).toBe("current · modified");
+    expect(
+      describeSubRepository({
+        repository: {
+          name: "docs",
+          path: "/tmp/workspace/repos/docs",
+          relativePath: "repos/docs",
+          kind: "child-repo",
+          relationship: "child",
+        },
+        path: "/tmp/workspace-feature-a/repos/docs",
+        hasChanges: true,
+      }),
+    ).toBe("child · modified");
   });
 });

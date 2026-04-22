@@ -35,7 +35,9 @@ class RepositoryItem extends vscode.TreeItem {
     this.contextValue = "arashi.repo";
     this.description = describeSubRepository({ repository, path, hasChanges });
     this.tooltip = this.description ? `${path}\n${this.description}` : path;
-    this.iconPath = new vscode.ThemeIcon(hasChanges ? "source-control" : repository.relationship === "current" ? "folder-active" : "folder");
+    this.iconPath = new vscode.ThemeIcon(
+      repository.relationship === "current" ? "folder-active" : "folder",
+    );
     this.command = {
       command: COMMAND_IDS.panelOpenRepo,
       title: "Open Repository",
