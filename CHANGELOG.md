@@ -1,3 +1,10 @@
+## [1.3.3](https://github.com/corwinm/arashi-vscode/compare/v1.3.2...v1.3.3) (2026-07-07)
+
+### Bug Fixes
+
+* parse list json envelope in VS Code extension ([#15](https://github.com/corwinm/arashi-vscode/issues/15)) ([50a6153](https://github.com/corwinm/arashi-vscode/commit/50a6153c72b19fc7686c8534cd54ef052dc8c675))
+* resolve Windows CLI shims ([#14](https://github.com/corwinm/arashi-vscode/issues/14)) ([03260d1](https://github.com/corwinm/arashi-vscode/commit/03260d1dce34f025460ee0d9f16e334e7fd51d74))
+
 ## [1.3.2](https://github.com/corwinm/arashi-vscode/compare/v1.3.1...v1.3.2) (2026-04-22)
 
 ### Bug Fixes
