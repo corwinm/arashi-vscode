@@ -54,8 +54,9 @@ async function waitForCallCount(expectedArgs: string[], expectedCount: number): 
   );
 }
 
-function normalizePathForComparison(path: string): string {
-  return process.platform === "win32" ? path.toLowerCase() : path;
+async function normalizePathForComparison(path: string): Promise<string> {
+  const realPath = await realpath(path);
+  return process.platform === "win32" ? realPath.toLowerCase() : realPath;
 }
 
 export async function run(): Promise<void> {
@@ -96,9 +97,11 @@ export async function run(): Promise<void> {
     ).length >= 2,
     "pull should refresh the worktree panel with arashi list --verbose --json after success",
   );
+  const normalizedWorkspaceRoot = await normalizePathForComparison(workspaceRoot);
+  const normalizedCallCwds = await Promise.all(calls.map((call) => normalizePathForComparison(call.cwd)));
   assert.ok(
-    calls.every((call) => normalizePathForComparison(call.cwd) === normalizePathForComparison(workspaceRoot)),
-    `all extension CLI calls should run from configured workspace root ${workspaceRoot}`,
+    normalizedCallCwds.every((cwd) => cwd === normalizedWorkspaceRoot),
+    `all extension CLI calls should run from configured workspace root ${workspaceRoot}. Saw cwd values: ${JSON.stringify(calls.map((call) => call.cwd))}`,
   );
   console.log("Arashi VS Code command smoke test passed");
 }
