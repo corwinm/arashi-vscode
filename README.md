@@ -90,3 +90,5 @@ The launch configurations mirror the oil.code workflow structure (extension-host
   - generate release notes and update `CHANGELOG.md`
   - bump `package.json` version and commit both files back to the repository
   - build/package the extension and publish the same release artifact to VS Marketplace and Open VSX
+- VS Marketplace publishing uses Microsoft Entra ID via GitHub Actions OIDC and `vsce publish --azure-credential`; Open VSX still uses `OVSX_PAT`.
+- Required GitHub secrets for release publishing: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, and `OVSX_PAT`. The Azure identity must be federated with this workflow and added to the VS Marketplace publisher with the Contributor role.

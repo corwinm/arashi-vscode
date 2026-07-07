@@ -62,7 +62,7 @@
       "@semantic-release/exec",
       {
         "prepareCmd": "bun run verify:release && bun run lint && bun run test && bun run build && mkdir -p dist && bunx @vscode/vsce package --out dist/arashi-vscode-${nextRelease.version}.vsix",
-        "publishCmd": "if [ -z \"$VSCE_PAT\" ]; then echo 'VSCE_PAT is required to publish to VS Marketplace'; exit 1; fi && if [ -z \"$OVSX_PAT\" ]; then echo 'OVSX_PAT is required to publish to Open VSX'; exit 1; fi && bunx @vscode/vsce publish --packagePath dist/arashi-vscode-${nextRelease.version}.vsix && bunx ovsx publish dist/arashi-vscode-${nextRelease.version}.vsix -p \"$OVSX_PAT\""
+        "publishCmd": "if [ -z \"$OVSX_PAT\" ]; then echo 'OVSX_PAT is required to publish to Open VSX'; exit 1; fi && bunx @vscode/vsce publish --azure-credential --packagePath dist/arashi-vscode-${nextRelease.version}.vsix && bunx ovsx publish dist/arashi-vscode-${nextRelease.version}.vsix -p \"$OVSX_PAT\""
       }
     ],
     [
