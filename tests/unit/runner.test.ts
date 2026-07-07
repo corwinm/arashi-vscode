@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { buildCommandArgs, normalizeCommandFailure, parseJsonOutput } from "../../src/cli/runner";
+import {
+  buildCommandArgs,
+  normalizeCommandFailure,
+  parseJsonOutput,
+  resolveSpawnTarget,
+} from "../../src/cli/runner";
 
 describe("runner helpers", () => {
   test("appends --json when parsed flow requires it", () => {
@@ -46,5 +51,29 @@ describe("runner helpers", () => {
       expect(parsed.kind).toBe("parse_error");
       expect(parsed.rawOutput).toBe("not-json");
     }
+  });
+
+  test("resolves the Windows direct-installer binary from PATH", () => {
+    const target = resolveSpawnTarget("arashi", ["list", "--json"], {
+      env: { Path: "C:\\Tools\\Arashi;C:\\Windows\\System32" },
+      fileExists: (path) => path === "C:\\Tools\\Arashi\\arashi.bin.exe",
+      platform: "win32",
+    });
+
+    expect(target).toEqual({
+      command: "C:\\Tools\\Arashi\\arashi.bin.exe",
+      args: ["list", "--json"],
+    });
+  });
+
+  test("falls back to the default Windows installer directory when VS Code has stale PATH", () => {
+    const target = resolveSpawnTarget("arashi", ["--version"], {
+      env: { Path: "C:\\Windows\\System32", USERPROFILE: "C:\\Users\\corwin" },
+      fileExists: (path) => path === "C:\\Users\\corwin\\.arashi\\bin\\arashi.bin.exe",
+      platform: "win32",
+    });
+
+    expect(target.command).toBe("C:\\Users\\corwin\\.arashi\\bin\\arashi.bin.exe");
+    expect(target.args).toEqual(["--version"]);
   });
 });

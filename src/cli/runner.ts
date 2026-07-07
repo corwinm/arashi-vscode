@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { win32 } from "node:path";
 
 export type CommandFailureReason = "spawn_error" | "exit_code" | "cancelled" | "timeout";
 
@@ -62,6 +64,17 @@ interface SpawnedProcess {
   kill(signal?: NodeJS.Signals): boolean;
 }
 
+export interface SpawnTarget {
+  command: string;
+  args: string[];
+}
+
+interface SpawnTargetResolutionOptions {
+  env?: NodeJS.ProcessEnv;
+  fileExists?: (path: string) => boolean;
+  platform?: NodeJS.Platform;
+}
+
 type SpawnFunction = (
   command: string,
   args: string[],
@@ -101,6 +114,60 @@ export function createCommandInvocation(request: CommandInvocationRequest): Comm
   };
 }
 
+function hasWindowsPathSeparator(value: string): boolean {
+  return value.includes("\\") || value.includes("/");
+}
+
+function windowsPathCandidates(binaryPath: string, env: NodeJS.ProcessEnv): string[] {
+  if (hasWindowsPathSeparator(binaryPath)) {
+    const directory = win32.dirname(binaryPath);
+    const basename = win32.basename(binaryPath).toLowerCase();
+    if (basename === "arashi" || basename === "arashi.bat" || basename === "arashi.ps1") {
+      return [win32.join(directory, "arashi.bin.exe")];
+    }
+    return [];
+  }
+
+  if (binaryPath.toLowerCase() !== "arashi") {
+    return [];
+  }
+
+  const pathEntries = (env.Path ?? env.PATH ?? "")
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  const candidates = pathEntries.map((entry) => win32.join(entry, "arashi.bin.exe"));
+  const userProfile = env.USERPROFILE?.trim();
+  if (userProfile) {
+    candidates.push(win32.join(userProfile, ".arashi", "bin", "arashi.bin.exe"));
+  }
+
+  return candidates;
+}
+
+export function resolveSpawnTarget(
+  binaryPath: string,
+  args: string[],
+  options: SpawnTargetResolutionOptions = {},
+): SpawnTarget {
+  const platform = options.platform ?? process.platform;
+  if (platform !== "win32") {
+    return { command: binaryPath, args: [...args] };
+  }
+
+  const env = options.env ?? process.env;
+  const fileExists = options.fileExists ?? existsSync;
+  const directInstallerBinary = windowsPathCandidates(binaryPath, env).find((candidate) =>
+    fileExists(candidate),
+  );
+
+  return {
+    command: directInstallerBinary ?? binaryPath,
+    args: [...args],
+  };
+}
+
 export async function runArashiCommand(
   request: CommandInvocationRequest,
   deps: CommandExecutorDependencies = {},
@@ -108,7 +175,8 @@ export async function runArashiCommand(
   const spawnFn = deps.spawnFn ?? spawn;
   const now = deps.now ?? Date.now;
   const invocation = createCommandInvocation(request);
-  const commandLine = [invocation.binaryPath, ...invocation.builtArgs].join(" ");
+  const spawnTarget = resolveSpawnTarget(invocation.binaryPath, invocation.builtArgs);
+  const commandLine = [spawnTarget.command, ...spawnTarget.args].join(" ");
   const startedAt = now();
 
   if (invocation.signal?.aborted) {
@@ -139,7 +207,7 @@ export async function runArashiCommand(
       resolve(result);
     };
 
-    const child = spawnFn(invocation.binaryPath, invocation.builtArgs, {
+    const child = spawnFn(spawnTarget.command, spawnTarget.args, {
       cwd: invocation.cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
