@@ -155,20 +155,12 @@ function defaultWindowsInstallerCandidate(binaryPath: string, env: NodeJS.Proces
   return win32.join(userProfile, ".arashi", "bin", "arashi.bin.exe");
 }
 
-function quoteWindowsShellArgument(value: string): string {
-  if (/^[A-Za-z0-9_./:=\\-]+$/.test(value)) {
-    return value;
-  }
-  return `"${value.replace(/"/g, '\\"')}"`;
-}
-
 function wrapWindowsExecutable(command: string, args: string[]): SpawnTarget {
   const extension = win32.extname(command).toLowerCase();
   if (extension === ".cmd" || extension === ".bat") {
-    const commandLine = [`"${command}"`, ...args.map(quoteWindowsShellArgument)].join(" ");
     return {
       command: "cmd.exe",
-      args: ["/d", "/s", "/c", `"${commandLine}"`],
+      args: ["/d", "/s", "/c", command, ...args],
     };
   }
 

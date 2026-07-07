@@ -90,7 +90,9 @@ describe("runner helpers", () => {
         "/d",
         "/s",
         "/c",
-        '""C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd" list --json"',
+        "C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd",
+        "list",
+        "--json",
       ],
     });
   });
