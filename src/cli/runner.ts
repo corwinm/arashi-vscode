@@ -118,32 +118,60 @@ function hasWindowsPathSeparator(value: string): boolean {
   return value.includes("\\") || value.includes("/");
 }
 
-function windowsPathCandidates(binaryPath: string, env: NodeJS.ProcessEnv): string[] {
-  if (hasWindowsPathSeparator(binaryPath)) {
-    const directory = win32.dirname(binaryPath);
-    const basename = win32.basename(binaryPath).toLowerCase();
-    if (basename === "arashi" || basename === "arashi.bat" || basename === "arashi.ps1") {
-      return [win32.join(directory, "arashi.bin.exe")];
-    }
-    return [];
-  }
-
-  if (binaryPath.toLowerCase() !== "arashi") {
-    return [];
-  }
-
-  const pathEntries = (env.Path ?? env.PATH ?? "")
+function windowsPathEntries(env: NodeJS.ProcessEnv): string[] {
+  return (env.Path ?? env.PATH ?? "")
     .split(";")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
+}
 
-  const candidates = pathEntries.map((entry) => win32.join(entry, "arashi.bin.exe"));
-  const userProfile = env.USERPROFILE?.trim();
-  if (userProfile) {
-    candidates.push(win32.join(userProfile, ".arashi", "bin", "arashi.bin.exe"));
+function windowsCommandCandidates(binaryPath: string, env: NodeJS.ProcessEnv): string[] {
+  const basename = win32.basename(binaryPath);
+  const extension = win32.extname(basename);
+  const executableNames = extension
+    ? [basename]
+    : [`${basename}.bin.exe`, `${basename}.exe`, `${basename}.cmd`, `${basename}.bat`, `${basename}.ps1`];
+
+  if (hasWindowsPathSeparator(binaryPath)) {
+    const directory = win32.dirname(binaryPath);
+    return executableNames.map((executableName) => win32.join(directory, executableName));
   }
 
-  return candidates;
+  return windowsPathEntries(env).flatMap((entry) =>
+    executableNames.map((executableName) => win32.join(entry, executableName)),
+  );
+}
+
+function defaultWindowsInstallerCandidate(binaryPath: string, env: NodeJS.ProcessEnv): string | null {
+  if (hasWindowsPathSeparator(binaryPath) || binaryPath.toLowerCase() !== "arashi") {
+    return null;
+  }
+
+  const userProfile = env.USERPROFILE?.trim();
+  if (!userProfile) {
+    return null;
+  }
+
+  return win32.join(userProfile, ".arashi", "bin", "arashi.bin.exe");
+}
+
+function wrapWindowsExecutable(command: string, args: string[]): SpawnTarget {
+  const extension = win32.extname(command).toLowerCase();
+  if (extension === ".cmd" || extension === ".bat") {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", `"${command}"`, ...args],
+    };
+  }
+
+  if (extension === ".ps1") {
+    return {
+      command: "powershell.exe",
+      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", command, ...args],
+    };
+  }
+
+  return { command, args: [...args] };
 }
 
 export function resolveSpawnTarget(
@@ -158,14 +186,14 @@ export function resolveSpawnTarget(
 
   const env = options.env ?? process.env;
   const fileExists = options.fileExists ?? existsSync;
-  const directInstallerBinary = windowsPathCandidates(binaryPath, env).find((candidate) =>
+  const commandCandidate = windowsCommandCandidates(binaryPath, env).find((candidate) =>
     fileExists(candidate),
   );
+  const installerFallback = defaultWindowsInstallerCandidate(binaryPath, env);
+  const resolvedCommand =
+    commandCandidate ?? (installerFallback && fileExists(installerFallback) ? installerFallback : binaryPath);
 
-  return {
-    command: directInstallerBinary ?? binaryPath,
-    args: [...args],
-  };
+  return wrapWindowsExecutable(resolvedCommand, args);
 }
 
 export async function runArashiCommand(

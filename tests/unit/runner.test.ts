@@ -76,4 +76,55 @@ describe("runner helpers", () => {
     expect(target.command).toBe("C:\\Users\\corwin\\.arashi\\bin\\arashi.bin.exe");
     expect(target.args).toEqual(["--version"]);
   });
+
+  test("runs Windows package-manager cmd shims through cmd.exe", () => {
+    const target = resolveSpawnTarget("arashi", ["list", "--json"], {
+      env: { Path: "C:\\Users\\corwin\\AppData\\Roaming\\npm" },
+      fileExists: (path) => path === "C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd",
+      platform: "win32",
+    });
+
+    expect(target).toEqual({
+      command: "cmd.exe",
+      args: [
+        "/d",
+        "/s",
+        "/c",
+        '"C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd"',
+        "list",
+        "--json",
+      ],
+    });
+  });
+
+  test("runs explicitly configured Windows PowerShell shims through powershell.exe", () => {
+    const target = resolveSpawnTarget("C:\\Tools\\Arashi\\arashi.ps1", ["--version"], {
+      fileExists: (path) => path === "C:\\Tools\\Arashi\\arashi.ps1",
+      platform: "win32",
+    });
+
+    expect(target).toEqual({
+      command: "powershell.exe",
+      args: [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Tools\\Arashi\\arashi.ps1",
+        "--version",
+      ],
+    });
+  });
+
+  test("resolves extensionless configured Windows paths to matching executables", () => {
+    const target = resolveSpawnTarget("C:\\Tools\\Arashi\\arashi", ["status", "--json"], {
+      fileExists: (path) => path === "C:\\Tools\\Arashi\\arashi.bin.exe",
+      platform: "win32",
+    });
+
+    expect(target).toEqual({
+      command: "C:\\Tools\\Arashi\\arashi.bin.exe",
+      args: ["status", "--json"],
+    });
+  });
 });
