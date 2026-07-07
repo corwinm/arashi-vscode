@@ -65,6 +65,21 @@ jobs:
       - name: Install Arashi via npm
         run: npm install -g arashi
 
+      - name: Prepare npm Arashi binary
+        shell: pwsh
+        run: |
+          where.exe arashi
+          $npmPrefix = npm prefix -g
+          Write-Host "npm prefix: $npmPrefix"
+          $packageBin = Join-Path $npmPrefix "node_modules/arashi/bin"
+          if (Test-Path $packageBin) {
+            Get-ChildItem $packageBin | Format-Table Name,Length
+          }
+          arashi install
+          if (Test-Path $packageBin) {
+            Get-ChildItem $packageBin | Format-Table Name,Length
+          }
+
       - name: Run package-manager CLI smoke test
         env:
           ARASHI_TEST_BINARY_PATH: arashi
