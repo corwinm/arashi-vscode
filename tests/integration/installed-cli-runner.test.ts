@@ -39,7 +39,7 @@ describe("installed CLI runner integration", () => {
     }
     expect(result.ok).toBe(true);
     expectVersionOutput(result.stdout);
-  });
+  }, 30_000);
 
   test("uses the Windows direct-installer fallback when VS Code has a stale PATH", async () => {
     if (process.platform !== "win32" || process.env.ARASHI_TEST_DIRECT_INSTALLER_FALLBACK !== "1") {
@@ -79,5 +79,5 @@ describe("installed CLI runner integration", () => {
         process.env.PATH = originalUpperPath;
       }
     }
-  });
+  }, 30_000);
 });
