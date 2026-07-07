@@ -67,6 +67,7 @@ interface SpawnedProcess {
 export interface SpawnTarget {
   command: string;
   args: string[];
+  shell?: boolean;
 }
 
 interface SpawnTargetResolutionOptions {
@@ -82,6 +83,7 @@ type SpawnFunction = (
     cwd: string;
     env: NodeJS.ProcessEnv;
     stdio: ["ignore", "pipe", "pipe"];
+    shell?: boolean;
   },
 ) => SpawnedProcess;
 
@@ -159,8 +161,9 @@ function wrapWindowsExecutable(command: string, args: string[]): SpawnTarget {
   const extension = win32.extname(command).toLowerCase();
   if (extension === ".cmd" || extension === ".bat") {
     return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", command, ...args],
+      command,
+      args: [...args],
+      shell: true,
     };
   }
 
@@ -239,6 +242,7 @@ export async function runArashiCommand(
       cwd: invocation.cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
+      shell: spawnTarget.shell,
     });
 
     const timeout = setTimeout(() => {

@@ -77,7 +77,7 @@ describe("runner helpers", () => {
     expect(target.args).toEqual(["--version"]);
   });
 
-  test("runs Windows package-manager cmd shims through cmd.exe", () => {
+  test("runs Windows package-manager cmd shims through the platform shell", () => {
     const target = resolveSpawnTarget("arashi", ["list", "--json"], {
       env: { Path: "C:\\Users\\corwin\\AppData\\Roaming\\npm" },
       fileExists: (path) => path === "C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd",
@@ -85,15 +85,9 @@ describe("runner helpers", () => {
     });
 
     expect(target).toEqual({
-      command: "cmd.exe",
-      args: [
-        "/d",
-        "/s",
-        "/c",
-        "C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd",
-        "list",
-        "--json",
-      ],
+      command: "C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd",
+      args: ["list", "--json"],
+      shell: true,
     });
   });
 
