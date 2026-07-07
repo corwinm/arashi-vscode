@@ -67,33 +67,46 @@ describe("runner helpers", () => {
   });
 
   test("falls back to the default Windows installer directory when VS Code has stale PATH", () => {
+    const userProfile = "C:\\Users\\ExampleUser";
+    const expectedBinary = `${userProfile}\\.arashi\\bin\\arashi.bin.exe`;
+
     const target = resolveSpawnTarget("arashi", ["--version"], {
-      env: { Path: "C:\\Windows\\System32", USERPROFILE: "C:\\Users\\corwin" },
-      fileExists: (path) => path === "C:\\Users\\corwin\\.arashi\\bin\\arashi.bin.exe",
+      env: { Path: "C:\\Windows\\System32", USERPROFILE: userProfile },
+      fileExists: (path) => path === expectedBinary,
       platform: "win32",
     });
 
-    expect(target.command).toBe("C:\\Users\\corwin\\.arashi\\bin\\arashi.bin.exe");
+    expect(target.command).toBe(expectedBinary);
     expect(target.args).toEqual(["--version"]);
   });
 
-  test("runs Windows package-manager cmd shims through cmd.exe", () => {
-    const target = resolveSpawnTarget("arashi", ["list", "--json"], {
-      env: { Path: "C:\\Users\\corwin\\AppData\\Roaming\\npm" },
-      fileExists: (path) => path === "C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd",
+  test("prefers npm-managed Windows package binaries over cmd shims", () => {
+    const target = resolveSpawnTarget("arashi", ["--version"], {
+      env: { Path: "C:\\npm\\prefix" },
+      fileExists: (path) => path === "C:\\npm\\prefix\\node_modules\\arashi\\bin\\arashi-windows-x64.exe",
       platform: "win32",
     });
 
     expect(target).toEqual({
-      command: "cmd.exe",
-      args: [
-        "/d",
-        "/s",
-        "/c",
-        '"C:\\Users\\corwin\\AppData\\Roaming\\npm\\arashi.cmd"',
-        "list",
-        "--json",
-      ],
+      command: "C:\\npm\\prefix\\node_modules\\arashi\\bin\\arashi-windows-x64.exe",
+      args: ["--version"],
+    });
+  });
+
+  test("runs Windows package-manager cmd shims through the platform shell", () => {
+    const npmPrefix = "C:\\Users\\ExampleUser\\AppData\\Roaming\\npm";
+    const expectedShim = `${npmPrefix}\\arashi.cmd`;
+
+    const target = resolveSpawnTarget("arashi", ["list", "--json"], {
+      env: { Path: npmPrefix },
+      fileExists: (path) => path === expectedShim,
+      platform: "win32",
+    });
+
+    expect(target).toEqual({
+      command: expectedShim,
+      args: ["list", "--json"],
+      shell: true,
     });
   });
 

@@ -67,6 +67,7 @@ interface SpawnedProcess {
 export interface SpawnTarget {
   command: string;
   args: string[];
+  shell?: boolean;
 }
 
 interface SpawnTargetResolutionOptions {
@@ -82,6 +83,7 @@ type SpawnFunction = (
     cwd: string;
     env: NodeJS.ProcessEnv;
     stdio: ["ignore", "pipe", "pipe"];
+    shell?: boolean;
   },
 ) => SpawnedProcess;
 
@@ -137,9 +139,17 @@ function windowsCommandCandidates(binaryPath: string, env: NodeJS.ProcessEnv): s
     return executableNames.map((executableName) => win32.join(directory, executableName));
   }
 
-  return windowsPathEntries(env).flatMap((entry) =>
-    executableNames.map((executableName) => win32.join(entry, executableName)),
-  );
+  return windowsPathEntries(env).flatMap((entry) => {
+    const directCandidates = executableNames.map((executableName) => win32.join(entry, executableName));
+    const packageBinaryCandidate = extension
+      ? []
+      : [
+          win32.join(entry, "node_modules", basename, "bin", `${basename}.bin.exe`),
+          win32.join(entry, "node_modules", basename, "bin", `${basename}-windows-x64.exe`),
+        ];
+
+    return [...directCandidates.slice(0, 2), ...packageBinaryCandidate, ...directCandidates.slice(2)];
+  });
 }
 
 function defaultWindowsInstallerCandidate(binaryPath: string, env: NodeJS.ProcessEnv): string | null {
@@ -159,8 +169,9 @@ function wrapWindowsExecutable(command: string, args: string[]): SpawnTarget {
   const extension = win32.extname(command).toLowerCase();
   if (extension === ".cmd" || extension === ".bat") {
     return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", `"${command}"`, ...args],
+      command,
+      args: [...args],
+      shell: true,
     };
   }
 
@@ -239,6 +250,7 @@ export async function runArashiCommand(
       cwd: invocation.cwd,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
+      shell: spawnTarget.shell,
     });
 
     const timeout = setTimeout(() => {
