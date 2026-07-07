@@ -39,6 +39,21 @@ async function waitForCall(expectedArgs: string[]): Promise<CliCall[]> {
   assert.fail(`Expected CLI call ${JSON.stringify(expectedArgs)}. Saw: ${JSON.stringify(calls)}`);
 }
 
+async function waitForCallCount(expectedArgs: string[], expectedCount: number): Promise<CliCall[]> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const calls = await readCliCalls();
+    const count = calls.filter((call) => JSON.stringify(call.args) === JSON.stringify(expectedArgs)).length;
+    if (count >= expectedCount) {
+      return calls;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const calls = await readCliCalls();
+  assert.fail(
+    `Expected at least ${expectedCount} CLI calls ${JSON.stringify(expectedArgs)}. Saw: ${JSON.stringify(calls)}`,
+  );
+}
+
 export async function run(): Promise<void> {
   console.log("Starting Arashi VS Code command smoke test");
   const workspaceRootRaw = process.env.ARASHI_VSCODE_TEST_WORKSPACE;
@@ -63,9 +78,14 @@ export async function run(): Promise<void> {
     "extension activation should refresh the worktree view with arashi list --verbose --json",
   );
 
+  const initialListCount = calls.filter((call) =>
+    JSON.stringify(call.args) === JSON.stringify(["list", "--verbose", "--json"]),
+  ).length;
+
   void vscode.commands.executeCommand("arashi.pull");
   calls = await waitForCall(["pull"]);
   assert.ok(hasCall(calls, ["pull"]), "pull command should invoke the Arashi CLI");
+  calls = await waitForCallCount(["list", "--verbose", "--json"], initialListCount + 1);
   assert.ok(
     calls.filter((call) =>
       JSON.stringify(call.args) === JSON.stringify(["list", "--verbose", "--json"]),
