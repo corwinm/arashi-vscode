@@ -54,6 +54,10 @@ async function waitForCallCount(expectedArgs: string[], expectedCount: number): 
   );
 }
 
+function normalizePathForComparison(path: string): string {
+  return process.platform === "win32" ? path.toLowerCase() : path;
+}
+
 export async function run(): Promise<void> {
   console.log("Starting Arashi VS Code command smoke test");
   const workspaceRootRaw = process.env.ARASHI_VSCODE_TEST_WORKSPACE;
@@ -93,7 +97,7 @@ export async function run(): Promise<void> {
     "pull should refresh the worktree panel with arashi list --verbose --json after success",
   );
   assert.ok(
-    calls.every((call) => call.cwd === workspaceRoot),
+    calls.every((call) => normalizePathForComparison(call.cwd) === normalizePathForComparison(workspaceRoot)),
     `all extension CLI calls should run from configured workspace root ${workspaceRoot}`,
   );
   console.log("Arashi VS Code command smoke test passed");

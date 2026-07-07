@@ -117,6 +117,7 @@ await prepareWorkspace();
 await buildExtensionTests();
 
 await runTests({
+  version: process.env.VSCODE_TEST_VERSION ?? "1.96.2",
   extensionDevelopmentPath: projectRoot,
   extensionTestsPath,
   launchArgs: [
