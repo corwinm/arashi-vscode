@@ -24,6 +24,12 @@ interface RawSubRepositoryItem {
   hasChanges?: unknown;
 }
 
+interface ListJsonEnvelope {
+  data?: {
+    worktrees?: unknown;
+  };
+}
+
 function inferRepositoryName(worktreePath: string): string {
   const segments = worktreePath.split(/[\\/]/).filter(Boolean);
   const reposIndex = segments.lastIndexOf("repos");
@@ -67,6 +73,19 @@ function isRawSubRepositoryItem(value: unknown): value is RawSubRepositoryItem {
 
   const item = value as RawSubRepositoryItem;
   return typeof item.relativePath === "string";
+}
+
+function extractWorktreeList(value: unknown): unknown[] | null {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const envelope = value as ListJsonEnvelope;
+  return Array.isArray(envelope.data?.worktrees) ? envelope.data.worktrees : null;
 }
 
 function toSubRepositoryModel(raw: RawSubRepositoryItem): ArashiSubRepository {
@@ -165,7 +184,8 @@ export class WorktreeService {
       };
     }
 
-    if (!Array.isArray(parsed.data)) {
+    const rawWorktrees = extractWorktreeList(parsed.data);
+    if (!Array.isArray(rawWorktrees)) {
       return {
         ok: false,
         kind: "parse_error",
@@ -175,7 +195,7 @@ export class WorktreeService {
       };
     }
 
-    const parsedWorktrees = parsed.data
+    const parsedWorktrees = rawWorktrees
       .filter((entry) => isRawWorktreeItem(entry))
       .map((entry) => toWorktreeModel(entry))
       .filter(

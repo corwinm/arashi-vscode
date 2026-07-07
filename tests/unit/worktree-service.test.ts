@@ -1,41 +1,43 @@
 import { describe, expect, test } from "bun:test";
 import { WorktreeService } from "../../src/worktrees/service";
 
+const listJsonPayload = [
+  {
+    path: "/tmp/workspace",
+    branch: "main",
+    hasChanges: true,
+    isMain: true,
+    locked: false,
+    subRepositories: [
+      {
+        relativePath: "repos/arashi-vscode",
+        branch: "main",
+        hasChanges: false,
+      },
+    ],
+  },
+  {
+    path: "/tmp/workspace/.arashi/worktrees/feature-a",
+    branch: "feature-a",
+    hasChanges: false,
+    isMain: false,
+    locked: false,
+    subRepositories: [
+      {
+        relativePath: "repos/arashi-vscode",
+        branch: "feature-a",
+        hasChanges: true,
+      },
+    ],
+  },
+];
+
 describe("worktree service", () => {
   test("marks only the most specific matching top-level worktree as current", async () => {
     const service = new WorktreeService(async () => ({
       ok: true,
       commandLine: "arashi list --verbose --json",
-      stdout: JSON.stringify([
-        {
-          path: "/tmp/workspace",
-          branch: "main",
-          hasChanges: true,
-          isMain: true,
-          locked: false,
-          subRepositories: [
-            {
-              relativePath: "repos/arashi-vscode",
-              branch: "main",
-              hasChanges: false,
-            },
-          ],
-        },
-        {
-          path: "/tmp/workspace/.arashi/worktrees/feature-a",
-          branch: "feature-a",
-          hasChanges: false,
-          isMain: false,
-          locked: false,
-          subRepositories: [
-            {
-              relativePath: "repos/arashi-vscode",
-              branch: "feature-a",
-              hasChanges: true,
-            },
-          ],
-        },
-      ]),
+      stdout: JSON.stringify(listJsonPayload),
       stderr: "",
       exitCode: 0,
       durationMs: 1,
@@ -58,5 +60,38 @@ describe("worktree service", () => {
       ["main", "sibling"],
     ]);
     expect(result.worktrees[0].subRepositories[0]?.hasChanges).toBe(true);
+  });
+
+  test("parses the arashi list --json envelope used by installed CLI versions", async () => {
+    const service = new WorktreeService(async (request) => ({
+      ok: true,
+      commandLine: "arashi list --verbose --json",
+      stdout: JSON.stringify({
+        ok: true,
+        schemaVersion: 1,
+        command: "list",
+        warnings: [],
+        data: {
+          worktrees: listJsonPayload,
+        },
+      }),
+      stderr: "",
+      exitCode: 0,
+      durationMs: 1,
+    }));
+
+    const result = await service.listWorktrees({
+      binaryPath: "arashi",
+      workspaceRoot: "/tmp/workspace/.arashi/worktrees/feature-a/repos/arashi-vscode",
+      commandTimeoutMs: 120000,
+      editorHost: "vscode",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.worktrees.map((worktree) => worktree.branch)).toEqual(["feature-a", "main"]);
   });
 });

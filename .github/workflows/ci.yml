@@ -44,3 +44,38 @@ jobs:
 
       - name: Run build
         run: bun run build
+
+  windows-installed-cli-smoke:
+    name: Windows Installed CLI Smoke
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Arashi via npm
+        run: npm install -g arashi
+
+      - name: Run package-manager CLI smoke test
+        env:
+          ARASHI_TEST_BINARY_PATH: arashi
+          ARASHI_TEST_REAL_CLI: "1"
+        run: bun test tests/integration/installed-cli-runner.test.ts
+
+      - name: Install Arashi via PowerShell direct installer
+        shell: pwsh
+        run: irm https://arashi.haphazard.dev/install.ps1 | iex
+
+      - name: Run direct-installer stale PATH smoke test
+        env:
+          ARASHI_TEST_DIRECT_INSTALLER_FALLBACK: "1"
+        run: bun test tests/integration/installed-cli-runner.test.ts
