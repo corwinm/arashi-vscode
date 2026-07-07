@@ -143,7 +143,10 @@ function windowsCommandCandidates(binaryPath: string, env: NodeJS.ProcessEnv): s
     const directCandidates = executableNames.map((executableName) => win32.join(entry, executableName));
     const packageBinaryCandidate = extension
       ? []
-      : [win32.join(entry, "node_modules", basename, "bin", `${basename}.bin.exe`)];
+      : [
+          win32.join(entry, "node_modules", basename, "bin", `${basename}.bin.exe`),
+          win32.join(entry, "node_modules", basename, "bin", `${basename}-windows-x64.exe`),
+        ];
 
     return [...directCandidates.slice(0, 2), ...packageBinaryCandidate, ...directCandidates.slice(2)];
   });
