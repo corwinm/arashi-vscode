@@ -185,7 +185,7 @@
     "verify:release": "bun run scripts/verify-release-metadata.ts",
     "release": "semantic-release",
     "package": "bunx @vscode/vsce package",
-    "publish:vsce": "bunx @vscode/vsce publish",
+    "publish:vsce": "bunx @vscode/vsce publish --azure-credential",
     "publish:ovsx": "bunx ovsx publish"
   },
   "devDependencies": {
