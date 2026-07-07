@@ -77,6 +77,19 @@ describe("runner helpers", () => {
     expect(target.args).toEqual(["--version"]);
   });
 
+  test("prefers npm-managed Windows package binaries over cmd shims", () => {
+    const target = resolveSpawnTarget("arashi", ["--version"], {
+      env: { Path: "C:\\npm\\prefix" },
+      fileExists: (path) => path === "C:\\npm\\prefix\\node_modules\\arashi\\bin\\arashi.bin.exe",
+      platform: "win32",
+    });
+
+    expect(target).toEqual({
+      command: "C:\\npm\\prefix\\node_modules\\arashi\\bin\\arashi.bin.exe",
+      args: ["--version"],
+    });
+  });
+
   test("runs Windows package-manager cmd shims through the platform shell", () => {
     const target = resolveSpawnTarget("arashi", ["list", "--json"], {
       env: { Path: "C:\\Users\\corwin\\AppData\\Roaming\\npm" },

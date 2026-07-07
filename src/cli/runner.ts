@@ -139,9 +139,14 @@ function windowsCommandCandidates(binaryPath: string, env: NodeJS.ProcessEnv): s
     return executableNames.map((executableName) => win32.join(directory, executableName));
   }
 
-  return windowsPathEntries(env).flatMap((entry) =>
-    executableNames.map((executableName) => win32.join(entry, executableName)),
-  );
+  return windowsPathEntries(env).flatMap((entry) => {
+    const directCandidates = executableNames.map((executableName) => win32.join(entry, executableName));
+    const packageBinaryCandidate = extension
+      ? []
+      : [win32.join(entry, "node_modules", basename, "bin", `${basename}.bin.exe`)];
+
+    return [...directCandidates.slice(0, 2), ...packageBinaryCandidate, ...directCandidates.slice(2)];
+  });
 }
 
 function defaultWindowsInstallerCandidate(binaryPath: string, env: NodeJS.ProcessEnv): string | null {
