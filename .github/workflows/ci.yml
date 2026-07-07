@@ -45,10 +45,14 @@ jobs:
       - name: Run build
         run: bun run build
 
-  windows-installed-cli-smoke:
-    name: Windows Installed CLI Smoke
-    runs-on: windows-latest
+  vscode-extension-smoke:
+    name: VS Code Extension Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -59,38 +63,21 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache Bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Install Arashi via npm
-        run: npm install -g arashi
+      - name: Run VS Code extension smoke test
+        if: runner.os != 'Linux'
+        run: bun run test:vscode
 
-      - name: Prepare npm Arashi binary
-        shell: pwsh
-        run: |
-          where.exe arashi
-          $npmPrefix = npm prefix -g
-          Write-Host "npm prefix: $npmPrefix"
-          $packageBin = Join-Path $npmPrefix "node_modules/arashi/bin"
-          if (Test-Path $packageBin) {
-            Get-ChildItem $packageBin | Format-Table Name,Length
-          }
-          arashi install
-          if (Test-Path $packageBin) {
-            Get-ChildItem $packageBin | Format-Table Name,Length
-          }
-
-      - name: Run package-manager CLI smoke test
-        env:
-          ARASHI_TEST_BINARY_PATH: arashi
-          ARASHI_TEST_REAL_CLI: "1"
-        run: bun test tests/integration/installed-cli-runner.test.ts
-
-      - name: Install Arashi via PowerShell direct installer
-        shell: pwsh
-        run: irm https://arashi.haphazard.dev/install.ps1 | iex
-
-      - name: Run direct-installer stale PATH smoke test
-        env:
-          ARASHI_TEST_DIRECT_INSTALLER_FALLBACK: "1"
-        run: bun test tests/integration/installed-cli-runner.test.ts
+      - name: Run VS Code extension smoke test
+        if: runner.os == 'Linux'
+        run: xvfb-run -a bun run test:vscode
