@@ -4,7 +4,8 @@ Manage Arashi worktrees directly from VS Code.
 
 ## Features
 
-- Run core Arashi commands from the command palette: `init`, `add`, `clone`, `create`, `pull`, `sync`, `switch`, `remove`
+- Run core Arashi commands from the command palette: `init`, `add`, `clone`, `create`, `status`, `move`, `prune`, `pull`, `sync`, `setup`, `shell`, `update`, `install`, `switch`, `remove`
+- Inspect workspace status, preview/apply stale worktree metadata pruning, run setup scripts, manage shell integration, update Arashi, and install/repair the platform binary without leaving the editor
 - Open the workspace root or a related repository in a new VS Code window from command-palette or panel flows
 - Browse worktrees in the **Arashi Worktrees** panel grouped by repository with repo, branch, path, and change status
 - Trigger contextual panel actions for switching, removing, refreshing, creating, and opening related repositories
@@ -21,6 +22,17 @@ The extension UI lives in the Explorer sidebar as **Arashi Worktrees**.
 4. If it is hidden, open the Explorer view menu and re-enable **Arashi Worktrees**.
 
 The panel appears after the extension activates for the current workspace. If you work from a child repo, set `arashi.workspaceRoot` when you want commands to execute against a different Arashi root.
+
+## Command Palette Workflows
+
+Open the VS Code command palette and search for `Arashi:` to run extension-backed workflows:
+
+- Workspace setup: `Arashi: Init Workspace`, `Arashi: Add Repository`, `Arashi: Clone Repositories`, `Arashi: Run Setup`
+- Worktree operations: `Arashi: Create Worktree`, `Arashi: Move Changes`, `Arashi: Switch Worktree`, `Arashi: Remove Worktree`, `Arashi: Prune Stale Worktrees`, `Arashi: Status`
+- Environment management: `Arashi: Manage Shell Integration`, `Arashi: Update Arashi`, `Arashi: Install Binary`
+- Navigation: `Arashi: Open Workspace Root`, `Arashi: Open Related Repository`
+
+The extension requests structured CLI output for flows it summarizes in the UI. Destructive or durable environment-changing actions—moving uncommitted changes, applying prune, running setup scripts, installing shell integration, applying updates, and installing/repairing the binary—require native confirmation before the CLI mutation runs.
 
 ## Panel Workflow
 
