@@ -1,3 +1,9 @@
+## [1.3.4](https://github.com/corwinm/arashi-vscode/compare/v1.3.3...v1.3.4) (2026-07-08)
+
+### Bug Fixes
+
+* clarify Marketplace install wording ([#17](https://github.com/corwinm/arashi-vscode/issues/17)) ([cce8313](https://github.com/corwinm/arashi-vscode/commit/cce831347b2ab576c54ca42a22992b706d5777e2))
+
 ## [1.3.3](https://github.com/corwinm/arashi-vscode/compare/v1.3.2...v1.3.3) (2026-07-07)
 
 ### Bug Fixes
