@@ -56,7 +56,7 @@ This README keeps extension-specific install and upgrade information only.
 
 1. Open Extensions in VS Code
 2. Search for `Arashi`
-3. Install and use extension updates from the built-in update flow
+3. Install the extension and use updates from the built-in update flow
 
 ### Open VSX
 
