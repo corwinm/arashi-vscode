@@ -12,6 +12,7 @@ import { COMMAND_IDS } from "../constants";
 import type { ResolvedExtensionConfig } from "../config";
 import { logCommandInvocation, logCommandResult, logDiagnostic, type OutputSink } from "../output";
 import type {
+  ArashiRepositoryStatus,
   ArashiWorktree,
   RelatedRepository,
   WorktreeRefreshResult,
@@ -73,6 +74,7 @@ export interface CommandHandlerDependencies {
   notifications: Notifications;
   runWithProgress?: ProgressRunner;
   openFolder?(path: string): Promise<void>;
+  openTerminal?(path: string): Promise<void>;
   output: OutputSink;
   worktreeStore: {
     getRelatedRepositories(): RelatedRepository[];
@@ -236,6 +238,17 @@ function isRelatedRepository(value: unknown): value is RelatedRepository {
   );
 }
 
+function isRepositoryStatus(value: unknown): value is ArashiRepositoryStatus {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "path" in value &&
+      typeof (value as ArashiRepositoryStatus).path === "string" &&
+      "name" in value &&
+      typeof (value as ArashiRepositoryStatus).name === "string",
+  );
+}
+
 function extractWorktree(value: unknown): ArashiWorktree | undefined {
   if (isWorktree(value)) {
     return value;
@@ -248,6 +261,23 @@ function extractWorktree(value: unknown): ArashiWorktree | undefined {
     isWorktree((value as { worktree?: unknown }).worktree)
   ) {
     return (value as { worktree: ArashiWorktree }).worktree;
+  }
+
+  return undefined;
+}
+
+function extractRepositoryStatus(value: unknown): ArashiRepositoryStatus | undefined {
+  if (isRepositoryStatus(value)) {
+    return value;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "repositoryStatus" in value &&
+    isRepositoryStatus((value as { repositoryStatus?: unknown }).repositoryStatus)
+  ) {
+    return (value as { repositoryStatus: ArashiRepositoryStatus }).repositoryStatus;
   }
 
   return undefined;
@@ -281,6 +311,11 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     deps.openFolder ??
     (async () => {
       throw new Error("Folder opening is not configured for this extension host.");
+    });
+  const openTerminal =
+    deps.openTerminal ??
+    (async () => {
+      throw new Error("Terminal opening is not configured for this extension host.");
     });
   const runWithProgress: ProgressRunner =
     deps.runWithProgress ?? (async (_title, task) => task());
@@ -472,6 +507,33 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       await safeNotify(deps.notifications.error(`Open repository failed: ${message}`));
+    }
+  };
+
+  const openRepositoryStatus = async (status: ArashiRepositoryStatus): Promise<void> => {
+    await openRepository({
+      name: status.name,
+      path: status.path,
+      relativePath: status.path,
+      kind: "child-repo",
+      relationship: "child",
+    });
+  };
+
+  const openRepositoryTerminal = async (status: ArashiRepositoryStatus): Promise<void> => {
+    if (!(await pathExists(status.path))) {
+      await safeNotify(
+        deps.notifications.error(`Open terminal failed: ${status.path} is missing or inaccessible.`),
+      );
+      return;
+    }
+
+    try {
+      await openTerminal(status.path);
+      await safeNotify(deps.notifications.success(`Opened terminal for ${status.name}.`));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      await safeNotify(deps.notifications.error(`Open terminal failed: ${message}`));
     }
   };
 
@@ -1126,6 +1188,47 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       }
 
       await openRepository(selected);
+    },
+
+    [COMMAND_IDS.panelOpenStatusRepo]: async (repositoryStatus: unknown) => {
+      const selected = extractRepositoryStatus(repositoryStatus);
+      if (!selected) {
+        await safeNotify(deps.notifications.warn("No repository status selected."));
+        return;
+      }
+
+      await openRepositoryStatus(selected);
+    },
+
+    [COMMAND_IDS.panelOpenTerminal]: async (repositoryStatus: unknown) => {
+      const selected = extractRepositoryStatus(repositoryStatus);
+      if (!selected) {
+        await safeNotify(deps.notifications.warn("No repository status selected."));
+        return;
+      }
+
+      await openRepositoryTerminal(selected);
+    },
+
+    [COMMAND_IDS.panelPullRepo]: async () => {
+      await runCommandWithFeedback({
+        command: "pull",
+        actionLabel: "Pull workspace",
+        progressTitle: "Pulling workspace...",
+        successMessage: "Pulled workspace.",
+        refreshAfterSuccess: true,
+      });
+    },
+
+    [COMMAND_IDS.panelCloneMissing]: async () => {
+      await runCommandWithFeedback({
+        command: "clone",
+        args: buildCloneArgs({ all: true }),
+        actionLabel: "Clone repositories",
+        progressTitle: "Cloning missing repositories...",
+        successMessage: "Clone completed.",
+        refreshAfterSuccess: true,
+      });
     },
 
     [COMMAND_IDS.panelSwitch]: async (worktree: unknown) => {

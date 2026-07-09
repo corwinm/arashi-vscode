@@ -7,7 +7,7 @@ import {
 } from "../cli/runner";
 import type { ResolvedExtensionConfig } from "../config";
 import { resolveArashiWorkspaceContext } from "../workspace/context";
-import type { ArashiSubRepository, ArashiWorktree, RelatedRepository, WorktreeListResult } from "./types";
+import type { ArashiRepositoryStatus, ArashiSubRepository, ArashiWorktree, RelatedRepository, WorktreeListResult } from "./types";
 
 interface RawWorktreeItem {
   path?: unknown;
@@ -28,6 +28,28 @@ interface ListJsonEnvelope {
   data?: {
     worktrees?: unknown;
   };
+}
+
+interface StatusJsonEnvelope {
+  data?: {
+    repositories?: unknown;
+  };
+}
+
+interface RawStatusRepository {
+  name?: unknown;
+  path?: unknown;
+  branch?: unknown;
+  files?: unknown;
+  error?: unknown;
+}
+
+interface RawStatusBranch {
+  localBranch?: unknown;
+  remoteBranch?: unknown;
+  ahead?: unknown;
+  behind?: unknown;
+  isDetached?: unknown;
 }
 
 function inferRepositoryName(worktreePath: string): string {
@@ -75,6 +97,10 @@ function isRawSubRepositoryItem(value: unknown): value is RawSubRepositoryItem {
   return typeof item.relativePath === "string";
 }
 
+function asNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function extractWorktreeList(value: unknown): unknown[] | null {
   if (Array.isArray(value)) {
     return value;
@@ -86,6 +112,54 @@ function extractWorktreeList(value: unknown): unknown[] | null {
 
   const envelope = value as ListJsonEnvelope;
   return Array.isArray(envelope.data?.worktrees) ? envelope.data.worktrees : null;
+}
+
+function extractStatusRepositoryList(value: unknown): unknown[] | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const envelope = value as StatusJsonEnvelope;
+  return Array.isArray(envelope.data?.repositories) ? envelope.data.repositories : null;
+}
+
+function isRawStatusRepository(value: unknown): value is RawStatusRepository {
+  return Boolean(value && typeof value === "object" && typeof (value as RawStatusRepository).path === "string");
+}
+
+function toStatusModel(raw: RawStatusRepository): ArashiRepositoryStatus {
+  const branchRaw = raw.branch && typeof raw.branch === "object" ? (raw.branch as RawStatusBranch) : null;
+  const branch = branchRaw
+    ? {
+        localBranch: typeof branchRaw.localBranch === "string" ? branchRaw.localBranch : null,
+        remoteBranch: typeof branchRaw.remoteBranch === "string" ? branchRaw.remoteBranch : null,
+        ahead: asNumber(branchRaw.ahead),
+        behind: asNumber(branchRaw.behind),
+        isDetached: Boolean(branchRaw.isDetached),
+      }
+    : null;
+  const fileCount = Array.isArray(raw.files) ? raw.files.length : 0;
+  const error = typeof raw.error === "string" && raw.error.trim().length > 0 ? raw.error : null;
+  const health: ArashiRepositoryStatus["health"] = error
+    ? "error"
+    : fileCount > 0
+      ? "dirty"
+      : branch && branch.ahead > 0 && branch.behind > 0
+        ? "diverged"
+        : branch && branch.behind > 0
+          ? "behind"
+          : branch && branch.ahead > 0
+            ? "ahead"
+            : "healthy";
+
+  return {
+    name: typeof raw.name === "string" && raw.name.trim().length > 0 ? raw.name : inferRepositoryName(raw.path as string),
+    path: raw.path as string,
+    branch,
+    fileCount,
+    error,
+    health,
+  };
 }
 
 function toSubRepositoryModel(raw: RawSubRepositoryItem): ArashiSubRepository {
@@ -134,6 +208,29 @@ function resolveCurrentTopLevelWorktreePath(
     .sort((left, right) => right.length - left.length)[0] ?? null;
 }
 
+function parseRepositoryStatuses(statusCommandResult: Awaited<ReturnType<CommandExecutor>>): {
+  repositoryStatuses: ArashiRepositoryStatus[];
+  statusWarning?: string;
+} {
+  const statusWarning =
+    "Workspace status dashboard could not read `arashi status --json`. Upgrade Arashi or check the Arashi output channel for diagnostics.";
+  if (!statusCommandResult.ok) {
+    return { repositoryStatuses: [], statusWarning };
+  }
+
+  const parsed = parseJsonOutput<unknown>(statusCommandResult.stdout);
+  if (!parsed.ok) {
+    return { repositoryStatuses: [], statusWarning };
+  }
+
+  const repositories = extractStatusRepositoryList(parsed.data);
+  if (!repositories) {
+    return { repositoryStatuses: [], statusWarning };
+  }
+
+  return { repositoryStatuses: repositories.filter(isRawStatusRepository).map(toStatusModel) };
+}
+
 export class WorktreeService {
   constructor(private readonly execute: CommandExecutor) {}
 
@@ -148,14 +245,24 @@ export class WorktreeService {
       .filter((repository) => repository.kind === "child-repo")
       .map((repository) => repository.relativePath);
 
-    const commandResult = await this.execute({
-      binaryPath: config.binaryPath,
-      command: "list",
-      args: ["--verbose"],
-      cwd: config.workspaceRoot,
-      timeoutMs: config.commandTimeoutMs,
-      enforceJson: true,
-    });
+    const [commandResult, statusCommandResult] = await Promise.all([
+      this.execute({
+        binaryPath: config.binaryPath,
+        command: "list",
+        args: ["--verbose"],
+        cwd: config.workspaceRoot,
+        timeoutMs: config.commandTimeoutMs,
+        enforceJson: true,
+      }),
+      this.execute({
+        binaryPath: config.binaryPath,
+        command: "status",
+        args: [],
+        cwd: config.workspaceRoot,
+        timeoutMs: config.commandTimeoutMs,
+        enforceJson: true,
+      }),
+    ]);
 
     if (!commandResult.ok) {
       const normalized = normalizeCommandFailure(commandResult as CommandFailure);
@@ -232,9 +339,13 @@ export class WorktreeService {
         return left.path.localeCompare(right.path);
       });
 
+    const { repositoryStatuses, statusWarning } = parseRepositoryStatuses(statusCommandResult);
+
     return {
       ok: true,
       worktrees,
+      repositoryStatuses,
+      statusWarning,
     };
   }
 }

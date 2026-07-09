@@ -7,8 +7,10 @@ Manage Arashi worktrees directly from VS Code.
 - Run core Arashi commands from the command palette: `init`, `add`, `clone`, `create`, `status`, `move`, `prune`, `pull`, `sync`, `setup`, `shell`, `update`, `install`, `switch`, `remove`
 - Inspect workspace status, preview/apply stale worktree metadata pruning, run setup scripts, manage shell integration, update Arashi, and install/repair the platform binary without leaving the editor
 - Open the workspace root or a related repository in a new VS Code window from command-palette or panel flows
-- Browse worktrees in the **Arashi Worktrees** panel grouped by repository with repo, branch, path, and change status
-- Trigger contextual panel actions for switching, removing, refreshing, creating, and opening related repositories
+- Use the **Arashi Worktrees** panel as a workspace status dashboard backed by `arashi status --json`
+- Browse repository health rows for clean, dirty, ahead/behind/diverged, and missing/error states
+- Browse worktrees grouped by repository with repo, branch, path, and change status
+- Trigger contextual panel actions for opening repositories, opening terminals, pulling drifted workspaces, cloning missing repositories, switching, removing, refreshing, and creating
 - Capture command context and diagnostics in the **Arashi** output channel
 - Use `arashi clone` from the integrated terminal to recover missing configured repositories
 
@@ -38,12 +40,21 @@ The extension requests structured CLI output for flows it summarizes in the UI. 
 
 Use this quick walkthrough when the panel is visible:
 
-1. Use the title-bar `+` action to run `Arashi: Create Worktree`.
-2. Use the title-bar refresh action after external terminal changes, or simply refocus the editor to let the panel refresh itself.
-3. Expand a repository node to inspect the worktrees associated with that repo.
-4. Select the inline arrow action on a worktree to switch to that exact worktree.
-5. Select the inline trash action on a worktree to remove it with a single confirmation.
-6. Use the repository context action or `Arashi: Open Related Repository` to open a repo-focused VS Code window.
+1. Expand **Workspace Status** to review the current coordinated workspace health from `arashi status --json`.
+2. Read each repository row for branch and tracking context:
+   - healthy rows use a pass icon and show branch/tracking state.
+   - dirty rows show the changed-file count.
+   - behind or diverged rows show ahead/behind counts such as `↑1↓2`.
+   - missing or errored rows show the CLI status error so recovery is visible.
+3. Use repository row actions to open the repo, open an integrated terminal at that repo, pull a drifted workspace, or clone missing configured repositories.
+4. Expand **Worktrees** to browse and manage the worktree list grouped by repository.
+5. Use the title-bar `+` action to run `Arashi: Create Worktree`.
+6. Use the title-bar refresh action after external terminal changes, or simply refocus the editor to let the panel refresh itself.
+7. Select the inline arrow action on a worktree to switch to that exact worktree.
+8. Select the inline trash action on a worktree to remove it with a single confirmation.
+9. Use the repository context action or `Arashi: Open Related Repository` to open a repo-focused VS Code window.
+
+The dashboard intentionally stays lightweight: it highlights coordinated workspace health and safe recovery shortcuts without replacing VS Code Source Control or adding a custom Git diff UI.
 
 This README uses structured guidance instead of screenshots so the onboarding text stays accurate across Marketplace and editor variants.
 

@@ -3,9 +3,65 @@ import { COMMAND_IDS } from "../constants";
 import type { ResolvedExtensionConfig } from "../config";
 import { buildWorktreeGroups, describeSubRepository, describeWorktree } from "./presentation";
 import { WorktreeStore } from "./store";
-import type { ArashiWorktree, RelatedRepository, WorktreeRefreshResult } from "./types";
+import type { ArashiRepositoryStatus, ArashiWorktree, RelatedRepository, WorktreeRefreshResult } from "./types";
 
-type TreeNode = WorktreeItem | RepositoryItem | PlaceholderItem;
+type TreeNode = SectionItem | StatusRepositoryItem | WorktreeItem | RepositoryItem | PlaceholderItem;
+
+class SectionItem extends vscode.TreeItem {
+  constructor(
+    readonly section: "status" | "worktrees",
+    label: string,
+    description: string,
+    collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.Expanded,
+  ) {
+    super(label, collapsibleState);
+    this.id = `section:${section}`;
+    this.contextValue = `arashi.section.${section}`;
+    this.description = description;
+    this.iconPath = new vscode.ThemeIcon(section === "status" ? "pulse" : "repo");
+  }
+}
+
+function describeStatus(status: ArashiRepositoryStatus): string {
+  const branch = status.branch;
+  const branchName = branch?.localBranch ?? (branch?.isDetached ? "detached" : "unknown");
+  const tracking = branch?.remoteBranch ? ` → ${branch.remoteBranch}` : "";
+  const drift = branch && (branch.ahead > 0 || branch.behind > 0)
+    ? ` · ${branch.ahead > 0 ? `↑${branch.ahead}` : ""}${branch.behind > 0 ? `↓${branch.behind}` : ""}`
+    : "";
+  const dirty = status.fileCount > 0 ? ` · ${status.fileCount} changed` : "";
+  const error = status.error ? ` · ${status.error}` : "";
+  return `${branchName}${tracking}${drift}${dirty}${error}`;
+}
+
+function statusIcon(status: ArashiRepositoryStatus): vscode.ThemeIcon {
+  if (status.health === "healthy") {
+    return new vscode.ThemeIcon("pass");
+  }
+  if (status.health === "error") {
+    return new vscode.ThemeIcon("error");
+  }
+  if (status.health === "dirty") {
+    return new vscode.ThemeIcon("warning");
+  }
+  return new vscode.ThemeIcon("repo-pull");
+}
+
+class StatusRepositoryItem extends vscode.TreeItem {
+  constructor(readonly repositoryStatus: ArashiRepositoryStatus) {
+    super(repositoryStatus.name, vscode.TreeItemCollapsibleState.None);
+    this.id = `status:${repositoryStatus.path}`;
+    this.contextValue = `arashi.statusRepo.${repositoryStatus.health}`;
+    this.description = describeStatus(repositoryStatus);
+    this.tooltip = `${repositoryStatus.path}\n${this.description}`;
+    this.iconPath = statusIcon(repositoryStatus);
+    this.command = {
+      command: COMMAND_IDS.panelOpenStatusRepo,
+      title: "Open Repository",
+      arguments: [{ repositoryStatus }],
+    };
+  }
+}
 
 class WorktreeItem extends vscode.TreeItem {
   constructor(readonly worktree: ArashiWorktree, readonly repositories: readonly RepositoryItem[]) {
@@ -61,6 +117,14 @@ class PlaceholderItem extends vscode.TreeItem {
   }
 }
 
+function summarizeStatusSection(statuses: readonly ArashiRepositoryStatus[]): string {
+  if (statuses.length === 0) {
+    return "not loaded";
+  }
+  const problemCount = statuses.filter((status) => status.health !== "healthy").length;
+  return problemCount === 0 ? `${statuses.length} healthy` : `${problemCount} needs attention`;
+}
+
 export class WorktreeTreeDataProvider implements vscode.TreeDataProvider<TreeNode> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<TreeNode | undefined>();
 
@@ -81,6 +145,30 @@ export class WorktreeTreeDataProvider implements vscode.TreeDataProvider<TreeNod
   getChildren(element?: TreeNode): vscode.ProviderResult<TreeNode[]> {
     const state = this.store.getState();
 
+    if (element instanceof SectionItem) {
+      if (element.section === "status") {
+        const statuses = state.repositoryStatuses ?? [];
+        return statuses.length > 0
+          ? statuses.map((status) => new StatusRepositoryItem(status))
+          : [new PlaceholderItem("No workspace status loaded yet. Refresh the panel.", "empty")];
+      }
+
+      if (state.worktrees.length === 0) {
+        return [new PlaceholderItem("No worktrees loaded yet. Run Refresh Arashi Worktrees.", "empty")];
+      }
+
+      return buildWorktreeGroups(state.relatedRepositories, state.worktrees).map(
+        ({ worktree, repositories }) =>
+          new WorktreeItem(
+            worktree,
+            repositories.map(
+              (repository) =>
+                new RepositoryItem(repository.repository, repository.path, repository.hasChanges),
+            ),
+          ),
+      );
+    }
+
     if (element instanceof WorktreeItem) {
       return [...element.repositories];
     }
@@ -89,7 +177,7 @@ export class WorktreeTreeDataProvider implements vscode.TreeDataProvider<TreeNod
       return [];
     }
 
-    if (state.worktrees.length === 0) {
+    if (state.worktrees.length === 0 && (state.repositoryStatuses ?? []).length === 0) {
       return [
         state.banner
           ? new PlaceholderItem(state.banner.message, state.banner.kind)
@@ -97,15 +185,10 @@ export class WorktreeTreeDataProvider implements vscode.TreeDataProvider<TreeNod
       ];
     }
 
-    return buildWorktreeGroups(state.relatedRepositories, state.worktrees).map(
-      ({ worktree, repositories }) =>
-        new WorktreeItem(
-          worktree,
-          repositories.map(
-            (repository) =>
-              new RepositoryItem(repository.repository, repository.path, repository.hasChanges),
-          ),
-        ),
-    );
+    const statuses = state.repositoryStatuses ?? [];
+    return [
+      new SectionItem("status", "Workspace Status", summarizeStatusSection(statuses)),
+      new SectionItem("worktrees", "Worktrees", `${state.worktrees.length} loaded`, vscode.TreeItemCollapsibleState.Collapsed),
+    ];
   }
 }

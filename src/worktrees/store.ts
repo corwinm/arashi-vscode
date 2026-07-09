@@ -1,10 +1,11 @@
 import type { ResolvedExtensionConfig } from "../config";
 import type {
+  ArashiRepositoryStatus,
+  ArashiWorktree,
   RelatedRepository,
   WorktreeListResult,
   WorktreeRefreshResult,
   WorktreeStoreState,
-  ArashiWorktree,
 } from "./types";
 
 export interface WorktreeServiceLike {
@@ -16,6 +17,8 @@ export class WorktreeStore {
   private relatedRepositories: RelatedRepository[] = [];
   private worktrees: ArashiWorktree[] = [];
   private lastKnownWorktrees: ArashiWorktree[] = [];
+  private repositoryStatuses: ArashiRepositoryStatus[] = [];
+  private lastKnownRepositoryStatuses: ArashiRepositoryStatus[] = [];
   private banner: WorktreeStoreState["banner"];
 
   constructor(private readonly service: WorktreeServiceLike) {}
@@ -32,6 +35,7 @@ export class WorktreeStore {
     return {
       relatedRepositories: [...this.relatedRepositories],
       worktrees: [...this.worktrees],
+      repositoryStatuses: [...this.repositoryStatuses],
       banner: this.banner,
     };
   }
@@ -46,8 +50,14 @@ export class WorktreeStore {
     if (result.ok) {
       this.worktrees = result.worktrees;
       this.lastKnownWorktrees = [...result.worktrees];
-      this.banner =
-        result.worktrees.length === 0
+      this.repositoryStatuses = result.repositoryStatuses ?? [];
+      this.lastKnownRepositoryStatuses = [...this.repositoryStatuses];
+      this.banner = result.statusWarning
+        ? {
+            kind: "warning",
+            message: result.statusWarning,
+          }
+        : result.worktrees.length === 0 && this.repositoryStatuses.length === 0
           ? {
               kind: "empty",
               message: "No worktrees were returned. Use Arashi: Add Repository or Arashi: Create Worktree.",
@@ -62,6 +72,7 @@ export class WorktreeStore {
 
     if (result.kind === "parse_error" && this.lastKnownWorktrees.length > 0) {
       this.worktrees = [...this.lastKnownWorktrees];
+      this.repositoryStatuses = [...this.lastKnownRepositoryStatuses];
       this.banner = {
         kind: "warning",
         message:
@@ -77,6 +88,7 @@ export class WorktreeStore {
     }
 
     this.worktrees = [];
+    this.repositoryStatuses = [];
     this.banner = {
       kind: "error",
       message:
