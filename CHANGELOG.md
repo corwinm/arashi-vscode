@@ -1,3 +1,10 @@
+## [1.4.0](https://github.com/corwinm/arashi-vscode/compare/v1.3.4...v1.4.0) (2026-07-09)
+
+### Features
+
+* add VS Code command parity flows ([#19](https://github.com/corwinm/arashi-vscode/issues/19)) ([22f6eeb](https://github.com/corwinm/arashi-vscode/commit/22f6eeb2b259b7a9f4033a8c7ff689bed7cf77ac))
+* add workspace status dashboard ([#20](https://github.com/corwinm/arashi-vscode/issues/20)) ([f16e019](https://github.com/corwinm/arashi-vscode/commit/f16e0194e9261fec8a78dfd7d5a945bd01e4803d))
+
 ## [1.3.4](https://github.com/corwinm/arashi-vscode/compare/v1.3.3...v1.3.4) (2026-07-08)
 
 ### Bug Fixes
