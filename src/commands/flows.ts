@@ -50,6 +50,36 @@ export function buildCloneArgs(input: { all?: boolean } = {}): string[] {
   return args;
 }
 
+export function buildMoveArgs(input: { from?: string; to: string }): string[] {
+  const args: string[] = [];
+  const from = input.from?.trim();
+  const to = input.to.trim();
+  if (from) {
+    args.push("--from", from);
+  }
+  args.push("--to", to);
+  return args;
+}
+
+export function buildSetupArgs(input: { only?: string } = {}): string[] {
+  const args: string[] = [];
+  const only = input.only?.trim();
+  if (only) {
+    args.push("--only", only);
+  }
+  return args;
+}
+
+export function buildUpdateArgs(mode: "check" | "dry-run" | "apply"): string[] {
+  if (mode === "check") {
+    return ["--check"];
+  }
+  if (mode === "dry-run") {
+    return ["--dry-run"];
+  }
+  return ["--yes"];
+}
+
 export function buildCreateArgs(branch: string, editorHost: EditorHost = null): string[] {
   const args = [branch.trim()];
   if (editorHost) {

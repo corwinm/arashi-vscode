@@ -21,8 +21,11 @@ import {
   buildCloneArgs,
   buildCreateArgs,
   buildInitArgs,
+  buildMoveArgs,
   buildRemoveArgs,
+  buildSetupArgs,
   buildSwitchArgs,
+  buildUpdateArgs,
   resolveRequiredPromptValue,
 } from "./flows";
 import type { HandlerMap } from "./registry";
@@ -88,6 +91,121 @@ interface AddCommandJson {
   error?: {
     message?: string;
   };
+}
+
+
+interface JsonEnvelope {
+  ok?: boolean;
+  command?: string;
+  data?: unknown;
+  error?: {
+    message?: string;
+  };
+  warnings?: unknown[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function summarizeStatus(data: unknown): string {
+  if (!isRecord(data)) {
+    return "Status completed.";
+  }
+  const summary = isRecord(data.summary) ? data.summary : undefined;
+  const clean = asNumber(summary?.cleanCount);
+  const dirty = asNumber(summary?.dirtyCount);
+  const total = asNumber(summary?.totalCount) ?? asNumber(summary?.total);
+  if (clean !== undefined && dirty !== undefined) {
+    const totalPart = total !== undefined ? ` across ${pluralize(total, "repository", "repositories")}` : "";
+    return `Status: ${pluralize(clean, "clean repo", "clean repos")}, ${pluralize(dirty, "dirty repo", "dirty repos")}${totalPart}.`;
+  }
+  return "Status completed. See the Arashi output channel for details.";
+}
+
+function summarizePrune(data: unknown, mode: "preview" | "apply"): string {
+  if (!isRecord(data)) {
+    return mode === "preview" ? "Prune preview completed." : "Prune completed.";
+  }
+  const totalPrunable = asNumber(data.totalPrunable);
+  const totalPruned = asNumber(data.totalPruned);
+  if (mode === "preview") {
+    return totalPrunable === 0
+      ? "Prune preview found no stale worktree metadata."
+      : `Prune preview found ${pluralize(totalPrunable ?? 0, "stale worktree entry", "stale worktree entries")}.`;
+  }
+  if (totalPruned !== undefined) {
+    return `Pruned ${pluralize(totalPruned, "stale worktree entry", "stale worktree entries")}.`;
+  }
+  return "Prune completed.";
+}
+
+function summarizeMove(data: unknown): string {
+  if (!isRecord(data)) {
+    return "Move changes completed.";
+  }
+  const moved = asNumber(data.totalMoved) ?? asNumber(data.movedCount);
+  const skipped = asNumber(data.totalSkipped) ?? asNumber(data.skippedCount);
+  const failed = asNumber(data.totalFailed) ?? asNumber(data.failedCount);
+  const parts = [
+    moved !== undefined ? pluralize(moved, "repo moved", "repos moved") : undefined,
+    skipped !== undefined ? pluralize(skipped, "repo skipped", "repos skipped") : undefined,
+    failed !== undefined ? pluralize(failed, "repo failed", "repos failed") : undefined,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? `Move changes completed: ${parts.join(", ")}.` : "Move changes completed.";
+}
+
+function summarizeSetup(data: unknown): string {
+  if (!isRecord(data)) {
+    return "Setup completed.";
+  }
+  const total = asNumber(data.total) ?? asNumber(data.totalRepositories);
+  const updated = asNumber(data.updated) ?? asNumber(data.succeeded) ?? asNumber(data.totalSucceeded);
+  const failed = asNumber(data.failed) ?? asNumber(data.totalFailed);
+  const parts = [
+    updated !== undefined ? pluralize(updated, "repo succeeded", "repos succeeded") : undefined,
+    failed !== undefined ? pluralize(failed, "repo failed", "repos failed") : undefined,
+    total !== undefined ? `${pluralize(total, "repo", "repos")} checked` : undefined,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? `Setup completed: ${parts.join(", ")}.` : "Setup completed.";
+}
+
+function summarizeUpdate(data: unknown, mode: "check" | "dry-run" | "apply"): string {
+  if (isRecord(data) && Array.isArray(data.messages) && data.messages.length > 0) {
+    const message = asString(data.messages[0]);
+    if (message) {
+      return message;
+    }
+  }
+  if (mode === "check") {
+    return "Update check completed.";
+  }
+  if (mode === "dry-run") {
+    return "Update dry run completed.";
+  }
+  return "Arashi update completed.";
+}
+
+function summarizeInstall(data: unknown): string {
+  if (isRecord(data) && Array.isArray(data.messages) && data.messages.length > 0) {
+    const message = asString(data.messages[0]);
+    if (message) {
+      return message;
+    }
+  }
+  return "Arashi binary install completed.";
 }
 
 interface MissingRepository {
@@ -511,6 +629,53 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     await safeNotify(deps.notifications.success(`Cloned ${selectedRepository.value.name}.`));
   };
 
+  const runJsonCommandWithFeedback = async (
+    input: {
+      command: string;
+      args?: string[];
+      actionLabel: string;
+      progressTitle: string;
+      successMessage(parsed: JsonEnvelope): string;
+      refreshAfterSuccess?: boolean;
+    },
+  ): Promise<JsonEnvelope | undefined> => {
+    const result = await runWithProgress(input.progressTitle, () =>
+      executeWithLogging(input.command, input.args ?? [], { enforceJson: true }),
+    );
+    if (!result.ok) {
+      await handleFailure(input.actionLabel, result);
+      return undefined;
+    }
+
+    const parsed = parseJsonOutput<JsonEnvelope>(result.stdout);
+    if (!parsed.ok) {
+      logDiagnostic(deps.output, `[json-parse-error] ${input.command}`, parsed.rawOutput);
+      await safeNotify(
+        deps.notifications.error(
+          `${input.actionLabel} returned unreadable JSON output. Check the Arashi output channel for diagnostics.`,
+        ),
+      );
+      deps.output.show?.(true);
+      return undefined;
+    }
+
+    if (parsed.data.ok === false) {
+      await safeNotify(
+        deps.notifications.error(
+          `${input.actionLabel} failed: ${parsed.data.error?.message ?? "unknown error"}`,
+        ),
+      );
+      return undefined;
+    }
+
+    if (input.refreshAfterSuccess) {
+      await refreshPanelState();
+    }
+
+    await safeNotify(deps.notifications.success(input.successMessage(parsed.data)));
+    return parsed.data;
+  };
+
   const runCommandWithFeedback = async (
     input: {
       command: string;
@@ -616,6 +781,261 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
 
       await refreshPanelState();
       await safeNotify(deps.notifications.success("Worktree created."));
+    },
+
+    [COMMAND_IDS.status]: async () => {
+      await runJsonCommandWithFeedback({
+        command: "status",
+        actionLabel: "Status",
+        progressTitle: "Checking Arashi status...",
+        successMessage: (parsed) => summarizeStatus(parsed.data),
+      });
+    },
+
+    [COMMAND_IDS.move]: async () => {
+      const fromRaw = await deps.notifications.input({
+        title: "Arashi Move Changes",
+        prompt: "Source branch, worktree name, or path (optional; leave blank for current workspace)",
+        placeHolder: "main or /path/to/source",
+      });
+      if (fromRaw === undefined) {
+        await safeNotify(deps.notifications.info("Move changes cancelled."));
+        return;
+      }
+
+      const toRaw = await deps.notifications.input({
+        title: "Arashi Move Changes",
+        prompt: "Target branch, worktree name, or path",
+        placeHolder: "feature/my-change or /path/to/target",
+      });
+      const to = resolveRequiredPromptValue(toRaw);
+      if (to.cancelled || !to.value) {
+        await safeNotify(deps.notifications.info("Move changes cancelled."));
+        return;
+      }
+
+      const confirmed = await deps.notifications.confirm({
+        title: "Confirm change movement",
+        message: `Move uncommitted changes${fromRaw.trim() ? ` from ${fromRaw.trim()}` : " from the current workspace"} to ${to.value}?`,
+        detail:
+          "Arashi uses recovery stashes, but this will mutate worktree state. Review the output channel after completion.",
+      });
+      if (!confirmed) {
+        await safeNotify(deps.notifications.info("Move changes cancelled."));
+        return;
+      }
+
+      await runJsonCommandWithFeedback({
+        command: "move",
+        args: buildMoveArgs({ from: fromRaw, to: to.value }),
+        actionLabel: "Move changes",
+        progressTitle: "Moving changes...",
+        successMessage: (parsed) => summarizeMove(parsed.data),
+        refreshAfterSuccess: true,
+      });
+    },
+
+    [COMMAND_IDS.prune]: async () => {
+      const preview = await runJsonCommandWithFeedback({
+        command: "prune",
+        args: ["--dry-run"],
+        actionLabel: "Prune preview",
+        progressTitle: "Previewing stale worktree metadata...",
+        successMessage: (parsed) => summarizePrune(parsed.data, "preview"),
+      });
+      if (!preview) {
+        return;
+      }
+
+      const data = isRecord(preview.data) ? preview.data : undefined;
+      const totalPrunable = asNumber(data?.totalPrunable) ?? 0;
+      if (totalPrunable === 0) {
+        return;
+      }
+
+      const confirmed = await deps.notifications.confirm({
+        title: "Confirm stale metadata pruning",
+        message: `Prune ${pluralize(totalPrunable, "stale worktree entry", "stale worktree entries")}?`,
+        detail: "This removes stale Git worktree metadata reported by the dry-run preview.",
+      });
+      if (!confirmed) {
+        await safeNotify(deps.notifications.info("Prune cancelled."));
+        return;
+      }
+
+      await runJsonCommandWithFeedback({
+        command: "prune",
+        actionLabel: "Prune stale worktrees",
+        progressTitle: "Pruning stale worktree metadata...",
+        successMessage: (parsed) => summarizePrune(parsed.data, "apply"),
+        refreshAfterSuccess: true,
+      });
+    },
+
+    [COMMAND_IDS.setup]: async () => {
+      const repositories = deps.worktreeStore.getRelatedRepositories();
+      const choices: Array<PickItem<string | undefined>> = [
+        {
+          label: "Run setup for all repositories",
+          description: "arashi setup",
+          value: undefined,
+        },
+        ...repositories
+          .filter((repository) => repository.kind !== "workspace-root")
+          .map((repository) => ({
+            label: `Run setup for ${repository.name}`,
+            description: "arashi setup --only",
+            detail: repository.path,
+            value: repository.name,
+          })),
+      ];
+      const choice = await deps.notifications.pick(choices, {
+        title: "Arashi Setup",
+        placeHolder: "Choose setup scope",
+      });
+      if (!choice) {
+        await safeNotify(deps.notifications.info("Setup cancelled."));
+        return;
+      }
+
+      const confirmed = await deps.notifications.confirm({
+        title: "Confirm setup scripts",
+        message: choice.value
+          ? `Run setup scripts for ${choice.value}?`
+          : "Run setup scripts for all configured repositories?",
+        detail: "Setup scripts can install dependencies or otherwise mutate repository state.",
+      });
+      if (!confirmed) {
+        await safeNotify(deps.notifications.info("Setup cancelled."));
+        return;
+      }
+
+      await runJsonCommandWithFeedback({
+        command: "setup",
+        args: buildSetupArgs({ only: choice.value }),
+        actionLabel: "Run setup",
+        progressTitle: "Running Arashi setup...",
+        successMessage: (parsed) => summarizeSetup(parsed.data),
+        refreshAfterSuccess: true,
+      });
+    },
+
+    [COMMAND_IDS.shell]: async () => {
+      const choice = await deps.notifications.pick(
+        [
+          {
+            label: "Install shell integration",
+            description: "arashi shell install",
+            value: "install" as const,
+          },
+          {
+            label: "Print shell wrapper code to output",
+            description: "arashi shell init",
+            value: "init" as const,
+          },
+        ],
+        {
+          title: "Arashi Shell Integration",
+          placeHolder: "Choose shell integration action",
+        },
+      );
+      if (!choice) {
+        await safeNotify(deps.notifications.info("Shell integration cancelled."));
+        return;
+      }
+
+      if (choice.value === "install") {
+        const confirmed = await deps.notifications.confirm({
+          title: "Confirm shell integration install",
+          message: "Install Arashi shell integration into your active shell startup file?",
+          detail: "This is a durable environment change managed by the Arashi CLI.",
+        });
+        if (!confirmed) {
+          await safeNotify(deps.notifications.info("Shell integration cancelled."));
+          return;
+        }
+      }
+
+      await runCommandWithFeedback({
+        command: "shell",
+        args: [choice.value],
+        actionLabel: "Shell integration",
+        progressTitle:
+          choice.value === "install"
+            ? "Installing shell integration..."
+            : "Generating shell integration...",
+        successMessage:
+          choice.value === "install"
+            ? "Shell integration installed."
+            : "Shell integration output generated in the Arashi output channel.",
+      });
+      if (choice.value === "init") {
+        deps.output.show?.(true);
+      }
+    },
+
+    [COMMAND_IDS.update]: async () => {
+      const choice = await deps.notifications.pick(
+        [
+          { label: "Check for updates", description: "arashi update --check", value: "check" as const },
+          { label: "Preview update plan", description: "arashi update --dry-run", value: "dry-run" as const },
+          { label: "Apply update", description: "arashi update --yes", value: "apply" as const },
+        ],
+        {
+          title: "Arashi Update",
+          placeHolder: "Choose update action",
+        },
+      );
+      if (!choice) {
+        await safeNotify(deps.notifications.info("Update cancelled."));
+        return;
+      }
+
+      if (choice.value === "apply") {
+        const confirmed = await deps.notifications.confirm({
+          title: "Confirm Arashi update",
+          message: "Apply the available Arashi update now?",
+          detail: "This may replace the installed Arashi binary or update the package-manager installation.",
+        });
+        if (!confirmed) {
+          await safeNotify(deps.notifications.info("Update cancelled."));
+          return;
+        }
+      }
+
+      await runJsonCommandWithFeedback({
+        command: "update",
+        args: buildUpdateArgs(choice.value),
+        actionLabel: "Update Arashi",
+        progressTitle:
+          choice.value === "check"
+            ? "Checking for Arashi updates..."
+            : choice.value === "dry-run"
+              ? "Previewing Arashi update..."
+              : "Updating Arashi...",
+        successMessage: (parsed) => summarizeUpdate(parsed.data, choice.value),
+        refreshAfterSuccess: choice.value === "apply",
+      });
+    },
+
+    [COMMAND_IDS.install]: async () => {
+      const confirmed = await deps.notifications.confirm({
+        title: "Confirm binary install",
+        message: "Install or repair the npm-managed Arashi platform binary?",
+        detail: "This mutates the local Arashi installation managed by the CLI.",
+      });
+      if (!confirmed) {
+        await safeNotify(deps.notifications.info("Install binary cancelled."));
+        return;
+      }
+
+      await runJsonCommandWithFeedback({
+        command: "install",
+        actionLabel: "Install binary",
+        progressTitle: "Installing Arashi binary...",
+        successMessage: (parsed) => summarizeInstall(parsed.data),
+        refreshAfterSuccess: true,
+      });
     },
 
     [COMMAND_IDS.openWorkspaceRoot]: async () => {

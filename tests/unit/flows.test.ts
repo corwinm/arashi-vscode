@@ -3,8 +3,11 @@ import {
   buildCloneArgs,
   buildCreateArgs,
   buildInitArgs,
+  buildMoveArgs,
   buildRemoveArgs,
+  buildSetupArgs,
   buildSwitchArgs,
+  buildUpdateArgs,
   resolveRequiredPromptValue,
 } from "../../src/commands/flows";
 
@@ -57,5 +60,26 @@ describe("command flow helpers", () => {
 
   test("omits editor host context for create when host is unknown", () => {
     expect(buildCreateArgs("feature/test", null)).toEqual(["feature/test"]);
+  });
+
+  test("builds move arguments with optional source", () => {
+    expect(buildMoveArgs({ from: " main ", to: " feature/test " })).toEqual([
+      "--from",
+      "main",
+      "--to",
+      "feature/test",
+    ]);
+    expect(buildMoveArgs({ to: "feature/test" })).toEqual(["--to", "feature/test"]);
+  });
+
+  test("builds setup arguments with optional repository scope", () => {
+    expect(buildSetupArgs()).toEqual([]);
+    expect(buildSetupArgs({ only: " arashi-vscode " })).toEqual(["--only", "arashi-vscode"]);
+  });
+
+  test("builds update arguments for check, dry-run, and apply modes", () => {
+    expect(buildUpdateArgs("check")).toEqual(["--check"]);
+    expect(buildUpdateArgs("dry-run")).toEqual(["--dry-run"]);
+    expect(buildUpdateArgs("apply")).toEqual(["--yes"]);
   });
 });

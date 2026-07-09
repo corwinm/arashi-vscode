@@ -436,4 +436,135 @@ describe("handlers cancellation paths", () => {
     });
     expect(progressTitles).toEqual(["Cloning repo-b..."]);
   });
+
+  test("runs expanded command-surface workflows with JSON and native confirmations", async () => {
+    const executedRequests: Array<{ command: string; args?: string[]; enforceJson?: boolean }> = [];
+    const progressTitles: string[] = [];
+    let confirmCount = 0;
+    let panelRefreshCount = 0;
+    const inputValues = ["", "feature/target"];
+
+    const handlers = createCommandHandlers({
+      getConfig: () => ({
+        binaryPath: "arashi",
+        workspaceRoot: "/tmp/workspace",
+        commandTimeoutMs: 120000,
+        editorHost: "vscode",
+      }),
+      execute: async (request) => {
+        executedRequests.push({
+          command: request.command,
+          args: request.args,
+          enforceJson: request.enforceJson,
+        });
+        const dataByCommand: Record<string, unknown> = {
+          status: { summary: { cleanCount: 2, dirtyCount: 1, totalCount: 3 } },
+          move: { totalMoved: 1, totalSkipped: 0, totalFailed: 0 },
+          prune: request.args?.includes("--dry-run")
+            ? { totalPrunable: 2, totalPruned: 0 }
+            : { totalPrunable: 2, totalPruned: 2 },
+          setup: { total: 2, succeeded: 2, failed: 0 },
+          update: { messages: ["Update check completed."] },
+          install: { messages: ["Binary installed."] },
+        };
+        return {
+          ok: true,
+          commandLine: `arashi ${request.command}`,
+          stdout:
+            request.command === "shell"
+              ? "shell output"
+              : JSON.stringify({ ok: true, command: request.command, data: dataByCommand[request.command] }),
+          stderr: "",
+          exitCode: 0,
+          durationMs: 2,
+        };
+      },
+      notifications: {
+        input: async () => inputValues.shift(),
+        pick: async (items) => items[0],
+        confirm: async () => {
+          confirmCount += 1;
+          return true;
+        },
+        info: async () => {},
+        warn: async () => {},
+        error: async () => {},
+        success: async () => {},
+      },
+      runWithProgress: async (title, task) => {
+        progressTitles.push(title);
+        return task();
+      },
+      output: {
+        appendLine: () => {},
+        show: () => {},
+      },
+      worktreeStore: {
+        getRelatedRepositories: () => [
+          {
+            name: "workspace",
+            path: "/tmp/workspace",
+            relativePath: ".",
+            kind: "workspace-root",
+            relationship: "parent",
+          },
+          {
+            name: "arashi-vscode",
+            path: "/tmp/workspace/repos/arashi-vscode",
+            relativePath: "repos/arashi-vscode",
+            kind: "child-repo",
+            relationship: "child",
+          },
+        ],
+        getWorktrees: () => [],
+        refresh: async () => ({
+          ok: true,
+          state: {
+            relatedRepositories: [],
+            worktrees: [],
+          },
+        }),
+      },
+      refreshWorktreePanel: async () => {
+        panelRefreshCount += 1;
+        return {
+          ok: true,
+          state: {
+            relatedRepositories: [],
+            worktrees: [],
+          },
+        };
+      },
+    });
+
+    await handlers[COMMAND_IDS.status]();
+    await handlers[COMMAND_IDS.move]();
+    await handlers[COMMAND_IDS.prune]();
+    await handlers[COMMAND_IDS.setup]();
+    await handlers[COMMAND_IDS.shell]();
+    await handlers[COMMAND_IDS.update]();
+    await handlers[COMMAND_IDS.install]();
+
+    expect(executedRequests).toEqual([
+      { command: "status", args: [], enforceJson: true },
+      { command: "move", args: ["--to", "feature/target"], enforceJson: true },
+      { command: "prune", args: ["--dry-run"], enforceJson: true },
+      { command: "prune", args: [], enforceJson: true },
+      { command: "setup", args: [], enforceJson: true },
+      { command: "shell", args: ["install"], enforceJson: undefined },
+      { command: "update", args: ["--check"], enforceJson: true },
+      { command: "install", args: [], enforceJson: true },
+    ]);
+    expect(confirmCount).toBe(5);
+    expect(panelRefreshCount).toBe(4);
+    expect(progressTitles).toContain("Checking Arashi status...");
+    expect(progressTitles).toContain("Moving changes...");
+    expect(progressTitles).toContain("Previewing stale worktree metadata...");
+    expect(progressTitles).toContain("Pruning stale worktree metadata...");
+    expect(progressTitles).toContain("Running Arashi setup...");
+    expect(progressTitles).toContain("Installing shell integration...");
+    expect(progressTitles).toContain("Checking for Arashi updates...");
+    expect(progressTitles).toContain("Installing Arashi binary...");
+  });
+
 });

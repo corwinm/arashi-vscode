@@ -29,6 +29,13 @@
     "onCommand:arashi.add",
     "onCommand:arashi.clone",
     "onCommand:arashi.create",
+    "onCommand:arashi.install",
+    "onCommand:arashi.update",
+    "onCommand:arashi.shell",
+    "onCommand:arashi.setup",
+    "onCommand:arashi.prune",
+    "onCommand:arashi.move",
+    "onCommand:arashi.status",
     "onCommand:arashi.openWorkspaceRoot",
     "onCommand:arashi.openRepository",
     "onCommand:arashi.pull",
@@ -60,6 +67,34 @@
         "command": "arashi.create",
         "title": "Arashi: Create Worktree",
         "icon": "$(add)"
+      },
+      {
+        "command": "arashi.status",
+        "title": "Arashi: Status"
+      },
+      {
+        "command": "arashi.move",
+        "title": "Arashi: Move Changes"
+      },
+      {
+        "command": "arashi.prune",
+        "title": "Arashi: Prune Stale Worktrees"
+      },
+      {
+        "command": "arashi.setup",
+        "title": "Arashi: Run Setup"
+      },
+      {
+        "command": "arashi.shell",
+        "title": "Arashi: Manage Shell Integration"
+      },
+      {
+        "command": "arashi.update",
+        "title": "Arashi: Update Arashi"
+      },
+      {
+        "command": "arashi.install",
+        "title": "Arashi: Install Binary"
       },
       {
         "command": "arashi.openWorkspaceRoot",
