@@ -111,17 +111,45 @@ describe("worktree provider", () => {
       },
     ];
 
-    const state = { relatedRepositories, worktrees };
+    const state = {
+      relatedRepositories,
+      worktrees,
+      repositoryStatuses: [
+        {
+          name: "workspace-main",
+          path: "/tmp/workspace",
+          branch: { localBranch: "main", remoteBranch: "origin/main", ahead: 0, behind: 0, isDetached: false },
+          fileCount: 0,
+          error: null,
+          health: "healthy" as const,
+        },
+        {
+          name: "app",
+          path: "/tmp/workspace/repos/app",
+          branch: { localBranch: "feature/a", remoteBranch: "origin/feature/a", ahead: 1, behind: 2, isDetached: false },
+          fileCount: 2,
+          error: null,
+          health: "dirty" as const,
+        },
+      ],
+    };
     const provider = new WorktreeTreeDataProvider({
       getState: () => state,
       refresh: async () => ({ ok: true as const, state }),
     } as never);
 
     const topLevel = provider.getChildren() as TreeItem[];
-    expect(topLevel.map((item) => item.label)).toEqual(["main", "feature/a"]);
-    expect(topLevel.map((item) => item.label)).not.toContain("app");
+    expect(topLevel.map((item) => item.label)).toEqual(["Workspace Status", "Worktrees"]);
 
-    const siblingWorktree = topLevel[1];
+    const statusRows = provider.getChildren(topLevel[0] as never) as TreeItem[];
+    expect(statusRows.map((item) => item.label)).toEqual(["workspace-main", "app"]);
+    expect(statusRows[1].description).toContain("2 changed");
+
+    const worktreeRows = provider.getChildren(topLevel[1] as never) as TreeItem[];
+    expect(worktreeRows.map((item) => item.label)).toEqual(["main", "feature/a"]);
+    expect(worktreeRows.map((item) => item.label)).not.toContain("app");
+
+    const siblingWorktree = worktreeRows[1];
     const nestedRepositories = provider.getChildren(siblingWorktree as never) as TreeItem[];
     expect(nestedRepositories.map((item) => item.label)).toEqual(["app", "docs"]);
 

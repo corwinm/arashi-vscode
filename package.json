@@ -44,6 +44,10 @@
     "onCommand:arashi.remove",
     "onCommand:arashi.worktrees.refresh",
     "onCommand:arashi.worktrees.openRepo",
+    "onCommand:arashi.worktrees.openStatusRepo",
+    "onCommand:arashi.worktrees.openTerminal",
+    "onCommand:arashi.worktrees.pullRepo",
+    "onCommand:arashi.worktrees.cloneMissing",
     "onCommand:arashi.worktrees.switch",
     "onCommand:arashi.worktrees.remove",
     "onCommand:arashi.worktrees.addRepo",
@@ -131,6 +135,26 @@
         "icon": "$(go-to-file)"
       },
       {
+        "command": "arashi.worktrees.openStatusRepo",
+        "title": "Open Repository",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "arashi.worktrees.openTerminal",
+        "title": "Open Terminal",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "arashi.worktrees.pullRepo",
+        "title": "Pull Workspace",
+        "icon": "$(repo-pull)"
+      },
+      {
+        "command": "arashi.worktrees.cloneMissing",
+        "title": "Clone Missing Repositories",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "arashi.worktrees.switch",
         "title": "Switch Worktree",
         "icon": "$(arrow-right)"
@@ -172,6 +196,26 @@
           "command": "arashi.worktrees.openRepo",
           "when": "view == arashi.worktrees && viewItem == arashi.repo",
           "group": "inline@1"
+        },
+        {
+          "command": "arashi.worktrees.openStatusRepo",
+          "when": "view == arashi.worktrees && viewItem =~ /arashi.statusRepo.*/",
+          "group": "inline@1"
+        },
+        {
+          "command": "arashi.worktrees.openTerminal",
+          "when": "view == arashi.worktrees && viewItem =~ /arashi.statusRepo.*/",
+          "group": "inline@2"
+        },
+        {
+          "command": "arashi.worktrees.pullRepo",
+          "when": "view == arashi.worktrees && (viewItem == arashi.statusRepo.behind || viewItem == arashi.statusRepo.diverged)",
+          "group": "inline@3"
+        },
+        {
+          "command": "arashi.worktrees.cloneMissing",
+          "when": "view == arashi.worktrees && viewItem == arashi.statusRepo.error",
+          "group": "inline@4"
         },
         {
           "command": "arashi.worktrees.switch",

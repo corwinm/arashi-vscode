@@ -110,6 +110,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         forceNewWindow: true,
       });
     },
+    openTerminal: async (path) => {
+      const terminal = vscode.window.createTerminal({ cwd: path, name: "Arashi" });
+      terminal.show();
+    },
     output,
     worktreeStore,
     refreshWorktreePanel: (config) => treeProvider.refresh(config),

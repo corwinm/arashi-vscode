@@ -18,12 +18,31 @@ export interface ArashiWorktree {
   subRepositories: ArashiSubRepository[];
 }
 
+export interface ArashiRepositoryStatusBranch {
+  localBranch: string | null;
+  remoteBranch: string | null;
+  ahead: number;
+  behind: number;
+  isDetached: boolean;
+}
+
+export interface ArashiRepositoryStatus {
+  name: string;
+  path: string;
+  branch: ArashiRepositoryStatusBranch | null;
+  fileCount: number;
+  error: string | null;
+  health: "healthy" | "dirty" | "ahead" | "behind" | "diverged" | "error";
+}
+
 export type WorktreeFetchErrorKind = "command_failure" | "parse_error" | "invalid_workspace";
 
 export type WorktreeListResult =
   | {
       ok: true;
       worktrees: ArashiWorktree[];
+      repositoryStatuses?: ArashiRepositoryStatus[];
+      statusWarning?: string;
     }
   | {
       ok: false;
@@ -35,6 +54,7 @@ export type WorktreeListResult =
 export interface WorktreeStoreState {
   relatedRepositories: RelatedRepository[];
   worktrees: ArashiWorktree[];
+  repositoryStatuses?: ArashiRepositoryStatus[];
   banner?: {
     kind: "empty" | "warning" | "error";
     message: string;
