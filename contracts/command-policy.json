@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "cliCommands": {
+    "add": { "state": "mapped", "commands": ["arashi.add", "arashi.worktrees.addRepo"] },
+    "clone": { "state": "mapped", "commands": ["arashi.clone", "arashi.worktrees.cloneMissing"] },
+    "create": { "state": "mapped", "commands": ["arashi.create"] },
+    "doctor": { "state": "excluded", "reason": "Doctor is a terminal-oriented diagnostic workflow whose detailed environment report is better consumed directly in a terminal." },
+    "exec": { "state": "excluded", "reason": "Arbitrary command execution needs terminal semantics and trust controls that the extension does not currently provide." },
+    "handoff": { "state": "excluded", "reason": "Handoff produces an agent-oriented context artifact and has no established editor workflow in the extension." },
+    "init": { "state": "mapped", "commands": ["arashi.init"] },
+    "install": { "state": "mapped", "commands": ["arashi.install"] },
+    "list": { "state": "represented", "commands": ["arashi.worktrees.refresh"], "views": ["arashi.worktrees"], "reason": "The worktree panel continuously presents list results; refresh updates that representation." },
+    "move": { "state": "mapped", "commands": ["arashi.move"] },
+    "prune": { "state": "mapped", "commands": ["arashi.prune"] },
+    "pull": { "state": "mapped", "commands": ["arashi.pull", "arashi.worktrees.pullRepo"] },
+    "push": { "state": "excluded", "reason": "Push is intentionally left to VS Code source control or a terminal to preserve review of branches and remotes before publishing." },
+    "remove": { "state": "mapped", "commands": ["arashi.remove", "arashi.worktrees.remove"] },
+    "setup": { "state": "mapped", "commands": ["arashi.setup"] },
+    "shell": { "state": "mapped", "commands": ["arashi.shell"] },
+    "status": { "state": "mapped", "commands": ["arashi.status"] },
+    "switch": { "state": "mapped", "commands": ["arashi.switch", "arashi.worktrees.switch"] },
+    "sync": { "state": "mapped", "commands": ["arashi.sync"] },
+    "update": { "state": "mapped", "commands": ["arashi.update"] }
+  },
+  "extensionOnlyCommands": [
+    "arashi.openRepository",
+    "arashi.openWorkspaceRoot",
+    "arashi.worktrees.openRepo",
+    "arashi.worktrees.openStatusRepo",
+    "arashi.worktrees.openTerminal"
+  ]
+}
