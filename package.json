@@ -283,6 +283,6 @@
     "conventional-changelog-conventionalcommits": "^8.0.0",
     "ovsx": "^0.10.5",
     "semantic-release": "^24.2.0",
-    "typescript": "^5.9.3"
+    "typescript": "7.0.2"
   }
 }
