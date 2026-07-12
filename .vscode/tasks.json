@@ -15,7 +15,7 @@
     {
       "label": "arashi-vscode: watch:build",
       "type": "shell",
-      "command": "bun run watch:build",
+      "command": "pnpm run watch:build",
       "isBackground": true,
       "problemMatcher": [
         {
@@ -29,8 +29,8 @@
           ],
           "background": {
             "activeOnStart": true,
-            "beginsPattern": "^(\\$ bun run watch:build|\\$ bun build)",
-            "endsPattern": "^Bundled .*"
+            "beginsPattern": "^> arashi-vscode@.* watch:build",
+            "endsPattern": "^\\[watch\\] build finished"
           }
         }
       ],
@@ -42,7 +42,7 @@
     {
       "label": "arashi-vscode: watch:tsc",
       "type": "shell",
-      "command": "bun run watch:tsc",
+      "command": "pnpm run watch:tsc",
       "isBackground": true,
       "problemMatcher": "$tsc-watch",
       "presentation": {
@@ -53,7 +53,7 @@
     {
       "label": "arashi-vscode: build",
       "type": "shell",
-      "command": "bun run build",
+      "command": "pnpm run build",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -63,7 +63,7 @@
     {
       "label": "arashi-vscode: test",
       "type": "shell",
-      "command": "bun run test",
+      "command": "pnpm run test",
       "group": "test"
     }
   ]

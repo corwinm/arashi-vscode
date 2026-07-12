@@ -99,7 +99,7 @@ Both marketplace releases are built from the same tagged artifact so version num
 
 Open `repos/arashi-vscode` as the active workspace folder before launching debug configs.
 
-1. Install dependencies: `bun install`
+1. Install dependencies: `pnpm install`
 2. Start extension debug host: press `F5` with `Run Extension` (build once, most reliable)
 3. For a hot-reload loop, use `Run Extension (Watch)` which runs `watch:tsc` and `watch:build` in parallel
 

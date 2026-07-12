@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import manifest from "../../package.json";
 import policy from "../../contracts/command-policy.json";
 import { createCommandHandlers } from "../../src/commands/handlers";

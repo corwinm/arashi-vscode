@@ -1,6 +1,7 @@
-**/*.test.ts
+.github/**
 tests/**
 scripts/**
+node_modules/**
 .vscode/**
 tsconfig.json
-bun.lock
+pnpm-lock.yaml

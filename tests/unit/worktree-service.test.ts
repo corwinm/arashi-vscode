@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { WorktreeService } from "../../src/worktrees/service";
 
 const listJsonPayload = [

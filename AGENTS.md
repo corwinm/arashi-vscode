@@ -16,6 +16,6 @@ This repository contains the Arashi VS Code extension.
 
 ## Validation
 
-- `bun run lint`
-- `bun test`
-- `bun run build`
+- `pnpm run lint`
+- `pnpm test`
+- `pnpm run build`

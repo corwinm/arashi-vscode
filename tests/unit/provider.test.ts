@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
 import type { ArashiWorktree, RelatedRepository } from "../../src/worktrees/types";
 
 class ThemeIcon {
@@ -26,7 +26,7 @@ class EventEmitter<T> {
   fire(_value?: T): void {}
 }
 
-mock.module("vscode", () => ({
+vi.doMock("vscode", () => ({
   EventEmitter,
   ThemeIcon,
   TreeItem,

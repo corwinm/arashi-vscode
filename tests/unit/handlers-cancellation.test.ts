@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { createCommandHandlers } from "../../src/commands/handlers";
 import { COMMAND_IDS } from "../../src/constants";
 

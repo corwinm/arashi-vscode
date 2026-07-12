@@ -1,10 +1,10 @@
-import { build } from "bun";
+import { build } from "esbuild";
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { runTests } from "@vscode/test-electron";
 
-const projectRoot = resolve(import.meta.dir, "..");
+const projectRoot = resolve(import.meta.dirname, "..");
 const outputRoot = join(projectRoot, ".vscode-test", "out");
 const extensionTestsPath = join(outputRoot, "suite", "index.js");
 const workspacePath = join(tmpdir(), `arashi-vscode-smoke-${process.pid}`);
@@ -100,36 +100,42 @@ process.exit(64);
 
 async function buildExtensionTests(): Promise<void> {
   await mkdir(outputRoot, { recursive: true });
-  const result = await build({
-    entrypoints: [join(projectRoot, "tests", "vscode", "suite", "index.ts")],
+  await build({
+    entryPoints: [join(projectRoot, "tests", "vscode", "suite", "index.ts")],
     outdir: join(outputRoot, "suite"),
-    target: "node",
+    target: "node20",
+    bundle: true,
+    platform: "node",
     format: "cjs",
     external: ["vscode"],
     sourcemap: "external",
   });
-  if (!result.success) {
-    throw new Error("Failed to build VS Code integration test suite");
-  }
 }
 
-await prepareWorkspace();
-await buildExtensionTests();
+async function main(): Promise<void> {
+  await prepareWorkspace();
+  await buildExtensionTests();
 
-await runTests({
-  version: process.env.VSCODE_TEST_VERSION ?? "1.96.2",
-  extensionDevelopmentPath: projectRoot,
-  extensionTestsPath,
-  launchArgs: [
-    workspacePath,
-    "--disable-extensions",
-    "--user-data-dir",
-    userDataDir,
-    "--extensions-dir",
-    extensionsDir,
-  ],
-  extensionTestsEnv: {
-    ARASHI_VSCODE_TEST_CLI_LOG: cliLogPath,
-    ARASHI_VSCODE_TEST_WORKSPACE: workspacePath,
-  },
+  await runTests({
+    version: process.env.VSCODE_TEST_VERSION ?? "1.96.2",
+    extensionDevelopmentPath: projectRoot,
+    extensionTestsPath,
+    launchArgs: [
+      workspacePath,
+      "--disable-extensions",
+      "--user-data-dir",
+      userDataDir,
+      "--extensions-dir",
+      extensionsDir,
+    ],
+    extensionTestsEnv: {
+      ARASHI_VSCODE_TEST_CLI_LOG: cliLogPath,
+      ARASHI_VSCODE_TEST_WORKSPACE: workspacePath,
+    },
+  });
+}
+
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
 });
