@@ -12,6 +12,7 @@
   },
   "icon": "images/arashi-logo.png",
   "engines": {
+    "node": ">=22.6.0",
     "vscode": "^1.96.2"
   },
   "categories": [
