@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "types": ["node", "vscode", "bun-types"],
+    "types": ["node", "vscode", "vitest/globals"],
     "noEmit": true,
     "rootDir": "."
   },

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -39,7 +39,7 @@ describe("validateStartup", () => {
 
   afterEach(async () => {
     process.chdir(originalCwd);
-    mock.restore();
+    vi.restoreAllMocks();
   });
 
   test("suppresses init warnings inside a sibling worktree of an initialized workspace", async () => {

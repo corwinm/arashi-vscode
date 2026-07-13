@@ -12,6 +12,7 @@
   },
   "icon": "images/arashi-logo.png",
   "engines": {
+    "node": ">=22.6.0",
     "vscode": "^1.96.2"
   },
   "categories": [
@@ -252,21 +253,22 @@
     }
   },
   "scripts": {
-    "build": "bun build src/extension.ts --outdir=dist --format=cjs --target=node --external=vscode --sourcemap",
-    "watch": "bun run watch:build",
-    "watch:build": "bun build src/extension.ts --outdir=dist --format=cjs --target=node --external=vscode --sourcemap --watch",
+    "build": "esbuild src/extension.ts --bundle --outdir=dist --platform=node --format=cjs --external:vscode --sourcemap",
+    "watch": "pnpm run watch:build",
+    "watch:build": "esbuild src/extension.ts --bundle --outdir=dist --platform=node --format=cjs --external:vscode --sourcemap --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "bun test",
-    "test:vscode": "bun run build && bun run scripts/run-vscode-integration-tests.ts",
-    "vscode:prepublish": "bun run build",
-    "verify:release": "bun run scripts/verify-release-metadata.ts",
+    "test": "vitest run",
+    "test:vscode": "pnpm run build && node scripts/run-vscode-integration-tests.mts",
+    "vscode:prepublish": "pnpm run build",
+    "verify:release": "node scripts/verify-release-metadata.mts",
     "release": "semantic-release",
-    "package": "bunx @vscode/vsce package",
-    "publish:vsce": "bunx @vscode/vsce publish --azure-credential",
-    "publish:ovsx": "bunx ovsx publish"
+    "package": "pnpm exec vsce package",
+    "publish:vsce": "pnpm exec vsce publish --azure-credential",
+    "publish:ovsx": "pnpm exec ovsx publish"
   },
+  "packageManager": "pnpm@10.15.1",
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
@@ -279,10 +281,11 @@
     "@types/vscode": "^1.96.0",
     "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.6.0",
-    "bun-types": "latest",
     "conventional-changelog-conventionalcommits": "^8.0.0",
+    "esbuild": "^0.25.0",
     "ovsx": "^0.10.5",
     "semantic-release": "^24.2.0",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "^3.2.0"
   }
 }

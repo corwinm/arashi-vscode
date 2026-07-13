@@ -99,7 +99,9 @@ Both marketplace releases are built from the same tagged artifact so version num
 
 Open `repos/arashi-vscode` as the active workspace folder before launching debug configs.
 
-1. Install dependencies: `bun install`
+Development requires Node.js 22.6.0 or newer and pnpm 10. The minimum Node.js version is required because the development and release commands execute `.mts` scripts directly using Node.js native TypeScript stripping; the scripts also use `import.meta.dirname`.
+
+1. Install dependencies: `pnpm install`
 2. Start extension debug host: press `F5` with `Run Extension` (build once, most reliable)
 3. For a hot-reload loop, use `Run Extension (Watch)` which runs `watch:tsc` and `watch:build` in parallel
 
