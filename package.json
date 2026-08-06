@@ -268,7 +268,7 @@
     "publish:vsce": "pnpm exec vsce publish --azure-credential",
     "publish:ovsx": "pnpm exec ovsx publish"
   },
-  "packageManager": "pnpm@10.15.1",
+  "packageManager": "pnpm@11.20.0",
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
