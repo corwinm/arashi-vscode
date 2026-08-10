@@ -135,6 +135,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
   const associatedConfigRoot = new AssociatedConfigRootTracker(resolveArashiWorkspaceRoot);
   const repositoryScanDepth = new RepositoryScanDepthCoordinator({
+    editorName: vscode.env.appName,
     activeCheckoutRoot: () => getConfig().workspaceRoot,
     workspaceFolders: workspaceFolderDescriptors,
     loadConfig: loadRepositoryScanConfig,

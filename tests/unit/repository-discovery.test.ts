@@ -63,6 +63,7 @@ function createHarness(): Harness {
   };
 
   const dependencies: RepositoryScanDepthDependencies = {
+    editorName: "Test Editor",
     activeCheckoutRoot: () => "/workspace",
     workspaceFolders: () => harness.folders,
     loadConfig: async () => harness.config,
@@ -397,7 +398,7 @@ describe("repository scan depth coordinator", () => {
     expect(harness.prompts).toHaveLength(1);
     expect(harness.prompts[0].actions).toEqual(["Update Workspace Setting", "Update User Setting"]);
     expect(harness.prompts[0].message).toBe(
-      "Show configured Arashi child repositories in Source Control by changing VS Code's Git repository scan depth to 3. Choose where to save this setting; User applies to all workspaces.",
+      "Show Arashi child repositories in Test Editor's Source Control view? This optional change increases Git repository scan depth to 3. Apply it to this workspace or your user profile; User affects all workspaces.",
     );
     expect(harness.updates).toEqual([]);
   });

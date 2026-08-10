@@ -23,6 +23,7 @@ describe("repository discovery activation wiring contract", () => {
   test("uses a non-modal scan-depth consent notification", async () => {
     const source = await activationSource();
 
+    expect(source).toContain('editorName: vscode.env.appName');
     expect(source).toMatch(
       /vscode\.window\.showInformationMessage\(message,\s*\.\.\.actions\)/u,
     );

@@ -241,6 +241,7 @@ export interface ScanSettingInspection {
 export type RepositoryScanSettingTarget = "workspace" | "global";
 
 export interface RepositoryScanDepthDependencies {
+  editorName: string;
   activeCheckoutRoot(): string;
   workspaceFolders(): readonly WorkspaceFolderDescriptor[];
   loadConfig(activeCheckoutRoot: string): Promise<RepositoryScanConfigResult>;
@@ -290,7 +291,7 @@ export class RepositoryScanDepthCoordinator {
     let choice: string | undefined;
     try {
       choice = await this.dependencies.chooseUpdateTarget(
-        buildRecommendationMessage(analysis.requirements),
+        buildRecommendationMessage(analysis.requirements, this.dependencies.editorName),
         [UPDATE_WORKSPACE_SETTING, UPDATE_USER_SETTING],
       );
     } catch (error) {
@@ -469,9 +470,15 @@ function buildSnapshotKey(requirements: readonly InsufficientRequirement[]): str
     .join("|");
 }
 
-function buildRecommendationMessage(requirements: readonly InsufficientRequirement[]): string {
+function buildRecommendationMessage(
+  requirements: readonly InsufficientRequirement[],
+  editorName: string,
+): string {
   const requiredDepth = Math.max(...requirements.map((requirement) => requirement.requiredDepth));
-  return `Show configured Arashi child repositories in Source Control by changing VS Code's Git repository scan depth to ${requiredDepth}. Choose where to save this setting; User applies to all workspaces.`;
+  const sourceControlView = editorName.trim()
+    ? `${editorName.trim()}'s Source Control view`
+    : "your editor's Source Control view";
+  return `Show Arashi child repositories in ${sourceControlView}? This optional change increases Git repository scan depth to ${requiredDepth}. Apply it to this workspace or your user profile; User affects all workspaces.`;
 }
 
 function describeError(error: unknown): string {
