@@ -149,9 +149,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
     },
     chooseUpdateTarget: (message, actions) =>
-      Promise.resolve(
-        vscode.window.showInformationMessage(message, { modal: true }, ...actions),
-      ),
+      Promise.resolve(vscode.window.showInformationMessage(message, ...actions)),
     updateSetting: async (value, target: RepositoryScanSettingTarget) => {
       await vscode.workspace.getConfiguration("git").update(
         "repositoryScanMaxDepth",

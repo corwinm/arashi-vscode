@@ -396,9 +396,9 @@ describe("repository scan depth coordinator", () => {
 
     expect(harness.prompts).toHaveLength(1);
     expect(harness.prompts[0].actions).toEqual(["Update Workspace Setting", "Update User Setting"]);
-    expect(harness.prompts[0].message).toContain("root");
-    expect(harness.prompts[0].message).toContain("other");
-    expect(harness.prompts[0].message).toContain("unrelated workspaces");
+    expect(harness.prompts[0].message).toBe(
+      "Show configured Arashi child repositories in Source Control by changing VS Code's Git repository scan depth to 3. Choose where to save this setting; User applies to all workspaces.",
+    );
     expect(harness.updates).toEqual([]);
   });
 
@@ -511,8 +511,8 @@ describe("repository scan depth coordinator", () => {
     await harness.coordinator.check();
 
     expect(harness.prompts).toHaveLength(2);
-    expect(harness.prompts[0].message).toContain("needs depth 2");
-    expect(harness.prompts[1].message).toContain("needs depth 3");
+    expect(harness.prompts[0].message).toContain("scan depth to 2");
+    expect(harness.prompts[1].message).toContain("scan depth to 3");
     expect(harness.updates).toEqual([{ value: 3, target: "workspace" }]);
   });
 

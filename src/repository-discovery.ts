@@ -470,14 +470,8 @@ function buildSnapshotKey(requirements: readonly InsufficientRequirement[]): str
 }
 
 function buildRecommendationMessage(requirements: readonly InsufficientRequirement[]): string {
-  const details = requirements
-    .map(
-      (requirement) =>
-        `${requirement.folder.identity} needs depth ${requirement.requiredDepth} (currently ${requirement.effective})`,
-    )
-    .sort()
-    .join("; ");
-  return `Arashi configured repositories need a larger git.repositoryScanMaxDepth: ${details}. Update this workspace or your user setting. The user setting applies globally and affects unrelated workspaces.`;
+  const requiredDepth = Math.max(...requirements.map((requirement) => requirement.requiredDepth));
+  return `Show configured Arashi child repositories in Source Control by changing VS Code's Git repository scan depth to ${requiredDepth}. Choose where to save this setting; User applies to all workspaces.`;
 }
 
 function describeError(error: unknown): string {
