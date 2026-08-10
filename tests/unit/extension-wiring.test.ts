@@ -20,6 +20,14 @@ describe("repository discovery activation wiring contract", () => {
     expect(source).toContain(".afterConfigurationChange(false, true)");
   });
 
+  test("keeps the scan-depth consent prompt modal until explicitly answered", async () => {
+    const source = await activationSource();
+
+    expect(source).toMatch(
+      /vscode\.window\.showInformationMessage\(message,\s*\{ modal: true \},\s*\.\.\.actions\)/u,
+    );
+  });
+
   test("routes visibility and focus refreshes through panel refresh plus recommendation", async () => {
     const source = await activationSource();
     const visibilityBlock = source.match(
