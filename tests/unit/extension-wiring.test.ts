@@ -46,4 +46,19 @@ describe("repository discovery activation wiring contract", () => {
       expect(block).not.toContain("treeProvider.refresh(getConfig())");
     }
   });
+
+  test("rebinds discovery when opened workspace folders change", async () => {
+    const source = await activationSource();
+    const workspaceFoldersBlock = source.match(
+      /const workspaceFoldersSubscription[\s\S]*?context\.subscriptions\.push\(workspaceFoldersSubscription\);/u,
+    )?.[0];
+
+    expect(workspaceFoldersBlock).toBeDefined();
+    expect(workspaceFoldersBlock).toContain("vscode.workspace.onDidChangeWorkspaceFolders");
+    expect(workspaceFoldersBlock).toContain("associatedConfigRoot.reset()");
+    expect(workspaceFoldersBlock).toContain("await treeProvider.refresh(getConfig())");
+    expect(workspaceFoldersBlock).toContain(
+      "await repositoryDiscovery.afterConfigurationChange(true, false)",
+    );
+  });
 });

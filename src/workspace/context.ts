@@ -50,6 +50,31 @@ export async function resolveArashiWorkspaceRoot(startPath: string): Promise<str
   }
 }
 
+export async function resolveArashiRepositoryPathBase(
+  activeCheckoutRoot: string,
+  configRoot: string,
+): Promise<string> {
+  const normalizedActiveRoot = resolve(activeCheckoutRoot);
+  const normalizedConfigRoot = resolve(configRoot);
+  if (normalizedActiveRoot === normalizedConfigRoot) {
+    return normalizedActiveRoot;
+  }
+
+  const activeCommonGitDir = await resolveCommonGitDir(normalizedActiveRoot);
+  if (activeCommonGitDir) {
+    const configCommonGitDir = await resolveCommonGitDir(normalizedConfigRoot);
+    if (configCommonGitDir === activeCommonGitDir) {
+      return normalizedActiveRoot;
+    }
+    const linkedRoots = await resolveSiblingWorktreeRoots(activeCommonGitDir);
+    if (linkedRoots.some((root) => resolve(root) === normalizedConfigRoot)) {
+      return normalizedActiveRoot;
+    }
+  }
+
+  return normalizedConfigRoot;
+}
+
 export async function resolveArashiWorkspaceContext(
   startPath: string,
 ): Promise<ArashiWorkspaceContext | null> {

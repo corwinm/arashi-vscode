@@ -65,6 +65,7 @@ function createHarness(): Harness {
   const dependencies: RepositoryScanDepthDependencies = {
     editorName: "Test Editor",
     activeCheckoutRoot: () => "/workspace",
+    resolveRepositoryPathBase: async (activeCheckoutRoot: string) => activeCheckoutRoot,
     workspaceFolders: () => harness.folders,
     loadConfig: async () => harness.config,
     inspectSetting: (folder) => {
@@ -462,11 +463,17 @@ describe("repository scan depth coordinator", () => {
     expect(harness.diagnostics.join(" ")).toContain("higher-precedence");
   });
 
-  test("logs and surfaces update failure and does not offer reload", async () => {
+  test("logs and surfaces update failure, allows retry, and does not offer reload on failure", async () => {
     const harness = createHarness();
     harness.choice = "Update User Setting";
-    harness.dependencies.updateSetting = async () => {
-      throw new Error("settings are locked");
+    let attempts = 0;
+    harness.dependencies.updateSetting = async (value, target) => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("settings are locked");
+      }
+      harness.updates.push({ value, target });
+      harness.inspections.set("root", { effective: value, global: value });
     };
 
     await harness.coordinator.check();
@@ -475,6 +482,51 @@ describe("repository scan depth coordinator", () => {
     expect(harness.userErrors.join(" ")).toContain("settings are locked");
     expect(harness.successes).toEqual([]);
     expect(harness.reloads).toBe(0);
+
+    await harness.coordinator.check();
+
+    expect(harness.prompts).toHaveLength(2);
+    expect(attempts).toBe(2);
+    expect(harness.updates).toEqual([{ value: 2, target: "global" }]);
+    expect(harness.successes).toHaveLength(1);
+  });
+
+  test("uses an ancestor config owner as the path base for a directly opened child repository", async () => {
+    const harness = createHarness();
+    harness.config = {
+      kind: "usable",
+      configPath: "/workspace/.arashi/config.json",
+      repositoryPaths: ["repos/app"],
+    };
+    harness.folders = [workspaceFolder("child", "/workspace/repos/app")];
+    harness.dependencies.activeCheckoutRoot = () => "/workspace/repos/app";
+    harness.dependencies.resolveRepositoryPathBase = async (
+      _activeCheckoutRoot: string,
+      configRoot: string,
+    ) => configRoot;
+
+    await harness.coordinator.check();
+
+    expect(harness.prompts).toEqual([]);
+  });
+
+  test("keeps the active linked-worktree root as the path base for sibling-owned config", async () => {
+    const harness = createHarness();
+    harness.config = {
+      kind: "usable",
+      configPath: "/workspace-main/.arashi/config.json",
+      repositoryPaths: ["repos/app"],
+    };
+    harness.folders = [workspaceFolder("feature", "/workspace-feature")];
+    harness.dependencies.activeCheckoutRoot = () => "/workspace-feature";
+    harness.dependencies.resolveRepositoryPathBase = async (activeCheckoutRoot: string) =>
+      activeCheckoutRoot;
+    harness.inspections.set("feature", { effective: 1 });
+
+    await harness.coordinator.check();
+
+    expect(harness.prompts).toHaveLength(1);
+    expect(harness.prompts[0].message).toContain("scan depth to 2");
   });
 
   test("logs and surfaces post-update effective verification failure without mutating WorkspaceFolder or reloading", async () => {

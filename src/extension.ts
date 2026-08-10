@@ -21,7 +21,10 @@ import {
   type RepositoryScanSettingTarget,
   type WorkspaceFolderDescriptor,
 } from "./repository-discovery";
-import { resolveArashiWorkspaceRoot } from "./workspace/context";
+import {
+  resolveArashiRepositoryPathBase,
+  resolveArashiWorkspaceRoot,
+} from "./workspace/context";
 import { WorktreeTreeDataProvider } from "./worktrees/provider";
 import { WorktreeService } from "./worktrees/service";
 import { WorktreeStore } from "./worktrees/store";
@@ -137,6 +140,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const repositoryScanDepth = new RepositoryScanDepthCoordinator({
     editorName: vscode.env.appName,
     activeCheckoutRoot: () => getConfig().workspaceRoot,
+    resolveRepositoryPathBase: resolveArashiRepositoryPathBase,
     workspaceFolders: workspaceFolderDescriptors,
     loadConfig: loadRepositoryScanConfig,
     inspectSetting: (folder) => {
@@ -265,6 +269,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   });
   context.subscriptions.push(configSubscription);
+
+  const workspaceFoldersSubscription = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    associatedConfigRoot.reset();
+    void (async () => {
+      await treeProvider.refresh(getConfig());
+      await repositoryDiscovery.afterConfigurationChange(true, false);
+    })().catch((error: unknown) =>
+      reportRepositoryDiscoveryError("workspace folders refresh failed", error),
+    );
+  });
+  context.subscriptions.push(workspaceFoldersSubscription);
 
   const visibilitySubscription = treeView.onDidChangeVisibility((event) => {
     scheduleVisibleRepositoryRefresh(

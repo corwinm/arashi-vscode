@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { resolveArashiWorkspaceRoot } from "./workspace/context";
 
 export const UPDATE_WORKSPACE_SETTING = "Update Workspace Setting";
@@ -243,6 +243,7 @@ export type RepositoryScanSettingTarget = "workspace" | "global";
 export interface RepositoryScanDepthDependencies {
   editorName: string;
   activeCheckoutRoot(): string;
+  resolveRepositoryPathBase(activeCheckoutRoot: string, configRoot: string): Promise<string>;
   workspaceFolders(): readonly WorkspaceFolderDescriptor[];
   loadConfig(activeCheckoutRoot: string): Promise<RepositoryScanConfigResult>;
   inspectSetting(folder: WorkspaceFolderDescriptor): ScanSettingInspection;
@@ -341,6 +342,7 @@ export class RepositoryScanDepthCoordinator {
         await this.dependencies.updateSetting(requiredValue, target);
         updated = true;
       } catch (error) {
+        this.shownSnapshots.delete(snapshot);
         await this.reportOperationFailure(
           `Could not update ${target} git.repositoryScanMaxDepth: ${describeError(error)}. Check whether the setting is locked or the settings file is writable.`,
         );
@@ -377,8 +379,13 @@ export class RepositoryScanDepthCoordinator {
       return { kind: "invalid", message: config.message };
     }
 
-    const requirements = calculateRequiredRepositoryScanDepths(
+    const configRoot = dirname(dirname(config.configPath));
+    const repositoryPathBase = await this.dependencies.resolveRepositoryPathBase(
       activeCheckoutRoot,
+      configRoot,
+    );
+    const requirements = calculateRequiredRepositoryScanDepths(
+      repositoryPathBase,
       this.dependencies.workspaceFolders(),
       config.repositoryPaths,
     );
