@@ -10,6 +10,21 @@ import {
 } from "./constants";
 import { resolveExtensionConfig, validateStartup, type WorkspaceFolderLike } from "./config";
 import { logDiagnostic } from "./output";
+import {
+  AssociatedConfigRootTracker,
+  RepositoryDiscoveryLifecycle,
+  RepositoryScanDepthCoordinator,
+  loadRepositoryScanConfig,
+  mapWorkspaceResource,
+  refreshThenScheduleRecommendation,
+  scheduleVisibleRepositoryRefresh,
+  type RepositoryScanSettingTarget,
+  type WorkspaceFolderDescriptor,
+} from "./repository-discovery";
+import {
+  resolveArashiRepositoryPathBase,
+  resolveArashiWorkspaceRoot,
+} from "./workspace/context";
 import { WorktreeTreeDataProvider } from "./worktrees/provider";
 import { WorktreeService } from "./worktrees/service";
 import { WorktreeStore } from "./worktrees/store";
@@ -75,6 +90,23 @@ function workspaceFoldersAsLike(
   }));
 }
 
+function workspaceFolderDescriptors(): WorkspaceFolderDescriptor[] {
+  return (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
+    identity: folder.uri.toString(),
+    path: folder.uri.fsPath,
+    resource: {
+      scheme: folder.uri.scheme,
+      authority: folder.uri.authority,
+      path: folder.uri.path,
+    },
+  }));
+}
+
+function resourceForPath(folder: WorkspaceFolderDescriptor, path: string): vscode.Uri {
+  const resource = mapWorkspaceResource(folder, path);
+  return resource.scheme === "file" ? vscode.Uri.file(path) : vscode.Uri.from(resource);
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const output = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
   context.subscriptions.push(output);
@@ -100,6 +132,77 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(treeView);
 
   const notifications = createNotificationsAdapter();
+  const reportRepositoryDiscoveryError = (operation: string, error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logDiagnostic(output, "[repository-discovery]", `${operation}: ${message}`);
+  };
+  const associatedConfigRoot = new AssociatedConfigRootTracker(resolveArashiWorkspaceRoot);
+  const repositoryScanDepth = new RepositoryScanDepthCoordinator({
+    editorName: vscode.env.appName,
+    activeCheckoutRoot: () => getConfig().workspaceRoot,
+    resolveRepositoryPathBase: resolveArashiRepositoryPathBase,
+    workspaceFolders: workspaceFolderDescriptors,
+    loadConfig: loadRepositoryScanConfig,
+    inspectSetting: (folder) => {
+      const configuration = vscode.workspace.getConfiguration("git", vscode.Uri.parse(folder.identity));
+      const inspection = configuration.inspect<unknown>("repositoryScanMaxDepth");
+      return {
+        effective: configuration.get<unknown>("repositoryScanMaxDepth"),
+        global: inspection?.globalValue,
+        workspace: inspection?.workspaceValue,
+        workspaceFolder: inspection?.workspaceFolderValue,
+      };
+    },
+    chooseUpdateTarget: (message, actions) =>
+      Promise.resolve(vscode.window.showInformationMessage(message, ...actions)),
+    updateSetting: async (value, target: RepositoryScanSettingTarget) => {
+      await vscode.workspace.getConfiguration("git").update(
+        "repositoryScanMaxDepth",
+        value,
+        target === "workspace"
+          ? vscode.ConfigurationTarget.Workspace
+          : vscode.ConfigurationTarget.Global,
+      );
+    },
+    showSuccess: (message, action) =>
+      Promise.resolve(vscode.window.showInformationMessage(message, action)),
+    reportDiagnostic: (message) => {
+      logDiagnostic(output, "[repository-discovery]", message);
+    },
+    showError: async (message) => {
+      await notifications.error(message);
+    },
+    reloadWindow: async () => {
+      await vscode.commands.executeCommand("workbench.action.reloadWindow");
+    },
+  });
+  const repositoryDiscovery = new RepositoryDiscoveryLifecycle({
+    recommend: () => repositoryScanDepth.check(),
+    createConfigWatcher: async () => {
+      const activeCheckoutRoot = getConfig().workspaceRoot;
+      const configRoot = await associatedConfigRoot.resolve(activeCheckoutRoot);
+      const folders = workspaceFolderDescriptors();
+      const providerFolder =
+        folders.find((folder) => folder.path === activeCheckoutRoot) ?? folders[0];
+      return vscode.workspace.createFileSystemWatcher(
+        configRoot && providerFolder
+          ? new vscode.RelativePattern(
+              resourceForPath(providerFolder, configRoot),
+              ".arashi/config.json",
+            )
+          : "**/.arashi/config.json",
+      );
+    },
+    reportError: (error) => reportRepositoryDiscoveryError("watcher refresh failed", error),
+  });
+  context.subscriptions.push(repositoryDiscovery);
+  const refreshPanelWithRepositoryDiscovery = async (config: ReturnType<typeof getConfig>) => {
+    return refreshThenScheduleRecommendation(
+      () => treeProvider.refresh(config),
+      () => repositoryDiscovery.afterPanelRefresh(),
+      (error) => reportRepositoryDiscoveryError("recommendation after refresh failed", error),
+    );
+  };
   const handlers = createCommandHandlers({
     getConfig,
     execute: (request) => runArashiCommand(request),
@@ -116,7 +219,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     output,
     worktreeStore,
-    refreshWorktreePanel: (config) => treeProvider.refresh(config),
+    refreshWorktreePanel: refreshPanelWithRepositoryDiscovery,
   });
   const registrations = registerCommandHandlers(vscode.commands, handlers);
   context.subscriptions.push(...registrations);
@@ -137,25 +240,70 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   await treeProvider.refresh(getConfig());
+  void repositoryDiscovery
+    .start(startup.ok)
+    .catch((error: unknown) => reportRepositoryDiscoveryError("startup failed", error));
+
+  let repositoryDiscoveryRestartQueue: Promise<void> = Promise.resolve();
+  const refreshPanelAndRestartRepositoryDiscovery = (): Promise<void> => {
+    const operation = repositoryDiscoveryRestartQueue.then(async () => {
+      const refreshedStartup = await validateStartup(getConfig(), (request) =>
+        runArashiCommand(request),
+      );
+      await repositoryDiscovery.start(false);
+      await treeProvider.refresh(getConfig());
+      await repositoryDiscovery.start(refreshedStartup.ok);
+    });
+    repositoryDiscoveryRestartQueue = operation.catch(() => undefined);
+    return operation;
+  };
 
   const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
     if (event.affectsConfiguration(EXTENSION_SETTINGS_SECTION)) {
-      void treeProvider.refresh(getConfig());
+      const affectsWorkspaceRoot = event.affectsConfiguration(
+        `${EXTENSION_SETTINGS_SECTION}.workspaceRoot`,
+      );
+      if (affectsWorkspaceRoot) {
+        associatedConfigRoot.reset();
+      }
+      void refreshPanelAndRestartRepositoryDiscovery().catch((error: unknown) =>
+        reportRepositoryDiscoveryError("configuration refresh failed", error),
+      );
+      return;
+    }
+    if (event.affectsConfiguration("git.repositoryScanMaxDepth")) {
+      void repositoryDiscovery
+        .afterConfigurationChange(false, true)
+        .catch((error: unknown) =>
+          reportRepositoryDiscoveryError("Git configuration refresh failed", error),
+        );
     }
   });
   context.subscriptions.push(configSubscription);
 
+  const workspaceFoldersSubscription = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    associatedConfigRoot.reset();
+    void refreshPanelAndRestartRepositoryDiscovery().catch((error: unknown) =>
+      reportRepositoryDiscoveryError("workspace folders refresh failed", error),
+    );
+  });
+  context.subscriptions.push(workspaceFoldersSubscription);
+
   const visibilitySubscription = treeView.onDidChangeVisibility((event) => {
-    if (event.visible) {
-      void treeProvider.refresh(getConfig());
-    }
+    scheduleVisibleRepositoryRefresh(
+      event.visible,
+      () => refreshPanelWithRepositoryDiscovery(getConfig()),
+      (error) => reportRepositoryDiscoveryError("visibility refresh failed", error),
+    );
   });
   context.subscriptions.push(visibilitySubscription);
 
   const focusSubscription = vscode.window.onDidChangeWindowState((state) => {
-    if (state.focused && treeView.visible) {
-      void treeProvider.refresh(getConfig());
-    }
+    scheduleVisibleRepositoryRefresh(
+      state.focused && treeView.visible,
+      () => refreshPanelWithRepositoryDiscovery(getConfig()),
+      (error) => reportRepositoryDiscoveryError("focus refresh failed", error),
+    );
   });
   context.subscriptions.push(focusSubscription);
 }

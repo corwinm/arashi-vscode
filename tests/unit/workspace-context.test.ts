@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveArashiWorkspaceContext, resolveArashiWorkspaceRoot } from "../../src/workspace/context";
+import {
+  resolveArashiRepositoryPathBase,
+  resolveArashiWorkspaceContext,
+  resolveArashiWorkspaceRoot,
+} from "../../src/workspace/context";
 
 describe("workspace context", () => {
   const cleanupPaths: string[] = [];
@@ -37,6 +41,7 @@ describe("workspace context", () => {
     );
 
     expect(await resolveArashiWorkspaceRoot(childRepo)).toBe(workspaceRoot);
+    expect(await resolveArashiRepositoryPathBase(childRepo, workspaceRoot)).toBe(workspaceRoot);
 
     const context = await resolveArashiWorkspaceContext(childRepo);
 
@@ -75,6 +80,7 @@ describe("workspace context", () => {
     await mkdir(join(mainRoot, ".git"), { recursive: true });
 
     expect(await resolveArashiWorkspaceRoot(siblingRoot)).toBe(mainRoot);
+    expect(await resolveArashiRepositoryPathBase(siblingRoot, mainRoot)).toBe(siblingRoot);
 
     const context = await resolveArashiWorkspaceContext(siblingRoot);
     expect(context?.repositories[0]).toMatchObject({
