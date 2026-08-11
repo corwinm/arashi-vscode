@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/corwinm/arashi-vscode/compare/v1.4.0...v1.5.0) (2026-08-11)
+
+### Features
+
+* recommend configured Git scan depth ([#31](https://github.com/corwinm/arashi-vscode/issues/31)) ([04b61ab](https://github.com/corwinm/arashi-vscode/commit/04b61abf1894b93efbb215a61ab40008cf8b6d40))
+
 ## [1.4.0](https://github.com/corwinm/arashi-vscode/compare/v1.3.4...v1.4.0) (2026-07-09)
 
 ### Features
