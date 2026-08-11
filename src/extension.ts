@@ -244,6 +244,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     .start(startup.ok)
     .catch((error: unknown) => reportRepositoryDiscoveryError("startup failed", error));
 
+  let repositoryDiscoveryRestartQueue: Promise<void> = Promise.resolve();
+  const refreshPanelAndRestartRepositoryDiscovery = (): Promise<void> => {
+    const operation = repositoryDiscoveryRestartQueue.then(async () => {
+      const refreshedStartup = await validateStartup(getConfig(), (request) =>
+        runArashiCommand(request),
+      );
+      await repositoryDiscovery.start(false);
+      await treeProvider.refresh(getConfig());
+      await repositoryDiscovery.start(refreshedStartup.ok);
+    });
+    repositoryDiscoveryRestartQueue = operation.catch(() => undefined);
+    return operation;
+  };
+
   const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
     if (event.affectsConfiguration(EXTENSION_SETTINGS_SECTION)) {
       const affectsWorkspaceRoot = event.affectsConfiguration(
@@ -252,10 +266,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (affectsWorkspaceRoot) {
         associatedConfigRoot.reset();
       }
-      void (async () => {
-        await treeProvider.refresh(getConfig());
-        await repositoryDiscovery.afterConfigurationChange(affectsWorkspaceRoot, false);
-      })().catch((error: unknown) =>
+      void refreshPanelAndRestartRepositoryDiscovery().catch((error: unknown) =>
         reportRepositoryDiscoveryError("configuration refresh failed", error),
       );
       return;
@@ -272,10 +283,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const workspaceFoldersSubscription = vscode.workspace.onDidChangeWorkspaceFolders(() => {
     associatedConfigRoot.reset();
-    void (async () => {
-      await treeProvider.refresh(getConfig());
-      await repositoryDiscovery.afterConfigurationChange(true, false);
-    })().catch((error: unknown) =>
+    void refreshPanelAndRestartRepositoryDiscovery().catch((error: unknown) =>
       reportRepositoryDiscoveryError("workspace folders refresh failed", error),
     );
   });

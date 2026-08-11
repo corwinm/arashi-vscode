@@ -327,6 +327,7 @@ export class RepositoryScanDepthCoordinator {
     );
     const selectedTargetValue = selectHighestTargetValue(selectedValues);
     if (selectedTargetValue.kind === "invalid") {
+      this.shownSnapshots.delete(snapshot);
       await this.dependencies.reportDiagnostic(
         `The selected ${target} git.repositoryScanMaxDepth value is invalid. Fix that setting before retrying.`,
       );

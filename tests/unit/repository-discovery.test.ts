@@ -555,6 +555,19 @@ describe("repository scan depth coordinator", () => {
     expect(harness.successes).toHaveLength(1);
   });
 
+  test("allows retrying after the user fixes an invalid selected-scope value", async () => {
+    const harness = createHarness();
+    harness.choice = "Update User Setting";
+    harness.inspections.set("root", { effective: 1, global: "two", workspace: 1 });
+
+    await harness.coordinator.check();
+    harness.inspections.set("root", { effective: 1, global: undefined, workspace: 1 });
+    await harness.coordinator.check();
+
+    expect(harness.prompts).toHaveLength(2);
+    expect(harness.diagnostics.join(" ")).toContain("selected global");
+  });
+
   test("logs and surfaces post-update effective verification failure without mutating WorkspaceFolder or reloading", async () => {
     const harness = createHarness();
     harness.choice = "Update User Setting";

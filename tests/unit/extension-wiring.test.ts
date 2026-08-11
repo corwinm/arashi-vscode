@@ -14,9 +14,8 @@ describe("repository discovery activation wiring contract", () => {
     expect(source).toMatch(
       /await treeProvider\.refresh\(getConfig\(\)\);\s*void repositoryDiscovery\s*\.start\(startup\.ok\)/u,
     );
-    expect(source).toContain(
-      "await repositoryDiscovery.afterConfigurationChange(affectsWorkspaceRoot, false)",
-    );
+    expect(source).toContain("const refreshedStartup = await validateStartup(");
+    expect(source).toContain("await repositoryDiscovery.start(refreshedStartup.ok)");
     expect(source).toContain(".afterConfigurationChange(false, true)");
   });
 
@@ -56,9 +55,6 @@ describe("repository discovery activation wiring contract", () => {
     expect(workspaceFoldersBlock).toBeDefined();
     expect(workspaceFoldersBlock).toContain("vscode.workspace.onDidChangeWorkspaceFolders");
     expect(workspaceFoldersBlock).toContain("associatedConfigRoot.reset()");
-    expect(workspaceFoldersBlock).toContain("await treeProvider.refresh(getConfig())");
-    expect(workspaceFoldersBlock).toContain(
-      "await repositoryDiscovery.afterConfigurationChange(true, false)",
-    );
+    expect(workspaceFoldersBlock).toContain("refreshPanelAndRestartRepositoryDiscovery()");
   });
 });
