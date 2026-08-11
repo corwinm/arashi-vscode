@@ -529,6 +529,32 @@ describe("repository scan depth coordinator", () => {
     expect(harness.prompts[0].message).toContain("scan depth to 2");
   });
 
+  test("allows retrying with a different scope after effective verification fails", async () => {
+    const harness = createHarness();
+    harness.choice = "Update User Setting";
+    harness.inspections.set("root", { effective: 1, global: 0, workspace: 1 });
+    harness.onUpdate = (value, target) => {
+      harness.inspections.set(
+        "root",
+        target === "global"
+          ? { effective: 1, global: value, workspace: 1 }
+          : { effective: value, global: 2, workspace: value },
+      );
+    };
+
+    await harness.coordinator.check();
+    harness.choice = "Update Workspace Setting";
+    await harness.coordinator.check();
+
+    expect(harness.prompts).toHaveLength(2);
+    expect(harness.updates).toEqual([
+      { value: 2, target: "global" },
+      { value: 2, target: "workspace" },
+    ]);
+    expect(harness.userErrors.join(" ")).toContain("higher-precedence");
+    expect(harness.successes).toHaveLength(1);
+  });
+
   test("logs and surfaces post-update effective verification failure without mutating WorkspaceFolder or reloading", async () => {
     const harness = createHarness();
     harness.choice = "Update User Setting";

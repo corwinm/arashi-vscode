@@ -352,6 +352,7 @@ export class RepositoryScanDepthCoordinator {
 
     const verificationFailure = this.verify(freshAnalysis.requirements);
     if (verificationFailure) {
+      this.shownSnapshots.delete(snapshot);
       await this.reportOperationFailure(verificationFailure);
       return;
     }
