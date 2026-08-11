@@ -585,6 +585,25 @@ describe("repository scan depth coordinator", () => {
     expect(harness.reloads).toBe(0);
   });
 
+  test("allows retrying after post-prompt analysis becomes invalid and is corrected", async () => {
+    const harness = createHarness();
+    harness.choice = "Update Workspace Setting";
+    const originalChoose = harness.dependencies.chooseUpdateTarget;
+    harness.dependencies.chooseUpdateTarget = async (message, actions) => {
+      if (harness.prompts.length === 0) {
+        harness.config = { kind: "invalid", message: "temporarily malformed" };
+      }
+      return originalChoose(message, actions);
+    };
+
+    await harness.coordinator.check();
+    harness.config = usable("repos/app");
+    await harness.coordinator.check();
+
+    expect(harness.prompts).toHaveLength(2);
+    expect(harness.diagnostics.join(" ")).toContain("temporarily malformed");
+  });
+
   test("requires renewed consent when recomputation changes the recommendation snapshot", async () => {
     const harness = createHarness();
     harness.choice = "Update Workspace Setting";

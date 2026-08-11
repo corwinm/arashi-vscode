@@ -309,6 +309,7 @@ export class RepositoryScanDepthCoordinator {
       return;
     }
     if (freshAnalysis.kind === "invalid") {
+      this.shownSnapshots.delete(snapshot);
       await this.dependencies.reportDiagnostic(freshAnalysis.message);
       return;
     }
