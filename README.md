@@ -7,12 +7,12 @@ Manage Arashi worktrees directly from VS Code.
 - Run core Arashi commands from the command palette: `init`, `add`, `clone`, `create`, `status`, `move`, `prune`, `pull`, `sync`, `setup`, `shell`, `update`, `install`, `switch`, `remove`
 - Inspect workspace status, preview/apply stale worktree metadata pruning, run setup scripts, manage shell integration, update Arashi, and install/repair the platform binary without leaving the editor
 - Open the workspace root or a related repository in a new VS Code window from command-palette or panel flows
-- Use the **Arashi Worktrees** panel as a workspace status dashboard backed by `arashi status --json`
+- Use the **Arashi Worktrees** panel as a workspace status dashboard backed by `aw status --json`
 - Browse repository health rows for clean, dirty, ahead/behind/diverged, and missing/error states
 - Browse worktrees grouped by repository with repo, branch, path, and change status
 - Trigger contextual panel actions for opening repositories, opening terminals, pulling drifted workspaces, cloning missing repositories, switching, removing, refreshing, and creating
 - Capture command context and diagnostics in the **Arashi** output channel
-- Use `arashi clone` from the integrated terminal to recover missing configured repositories
+- Use `aw clone` from the integrated terminal to recover missing configured repositories
 
 ## Find the Panel
 
@@ -40,7 +40,7 @@ The extension requests structured CLI output for flows it summarizes in the UI. 
 
 Use this quick walkthrough when the panel is visible:
 
-1. Expand **Workspace Status** to review the current coordinated workspace health from `arashi status --json`.
+1. Expand **Workspace Status** to review the current coordinated workspace health from `aw status --json`.
 2. Read each repository row for branch and tracking context:
    - healthy rows use a pass icon and show branch/tracking state.
    - dirty rows show the changed-file count.
