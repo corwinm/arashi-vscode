@@ -939,14 +939,14 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
       const choices: Array<PickItem<string | undefined>> = [
         {
           label: "Run setup for all repositories",
-          description: "arashi setup",
+          description: "aw setup",
           value: undefined,
         },
         ...repositories
           .filter((repository) => repository.kind !== "workspace-root")
           .map((repository) => ({
             label: `Run setup for ${repository.name}`,
-            description: "arashi setup --only",
+            description: "aw setup --only",
             detail: repository.path,
             value: repository.name,
           })),
@@ -987,12 +987,12 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
         [
           {
             label: "Install shell integration",
-            description: "arashi shell install",
+            description: "aw shell install",
             value: "install" as const,
           },
           {
             label: "Print shell wrapper code to output",
-            description: "arashi shell init",
+            description: "aw shell init",
             value: "init" as const,
           },
         ],
@@ -1039,9 +1039,9 @@ export function createCommandHandlers(deps: CommandHandlerDependencies): Handler
     [COMMAND_IDS.update]: async () => {
       const choice = await deps.notifications.pick(
         [
-          { label: "Check for updates", description: "arashi update --check", value: "check" as const },
-          { label: "Preview update plan", description: "arashi update --dry-run", value: "dry-run" as const },
-          { label: "Apply update", description: "arashi update --yes", value: "apply" as const },
+          { label: "Check for updates", description: "aw update --check", value: "check" as const },
+          { label: "Preview update plan", description: "aw update --dry-run", value: "dry-run" as const },
+          { label: "Apply update", description: "aw update --yes", value: "apply" as const },
         ],
         {
           title: "Arashi Update",

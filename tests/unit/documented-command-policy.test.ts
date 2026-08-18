@@ -12,10 +12,11 @@ const legacyInvocation = new RegExp(
 );
 const compatibilityNote =
   "`arashi` executable remains supported for existing scripts and workflows";
+const compatibilitySourceLine = `lowerCombined.includes("arashi init")`;
 
 function findPreferredArashiInvocations(content: string, source: string) {
   return content.split(/\r?\n/).flatMap((line, index) => {
-    if (line.includes(compatibilityNote)) return [];
+    if (line.includes(compatibilityNote) || line.includes(compatibilitySourceLine)) return [];
     legacyInvocation.lastIndex = 0;
     return legacyInvocation.test(line)
       ? [{ line: index + 1, source, text: line.trim() }]
@@ -24,8 +25,13 @@ function findPreferredArashiInvocations(content: string, source: string) {
 }
 
 describe("primary documented command policy", () => {
-  test("README terminal guidance uses aw", () => {
-    expect(findPreferredArashiInvocations(readFileSync("README.md", "utf8"), "README.md")).toEqual([]);
+  test("maintained user-facing guidance uses aw", () => {
+    const sources = ["README.md", "src/commands/handlers.ts", "src/worktrees/service.ts"];
+    const violations = sources.flatMap((source) =>
+      findPreferredArashiInvocations(readFileSync(source, "utf8"), source),
+    );
+
+    expect(violations).toEqual([]);
   });
 
   test("rejects preferred arashi examples", () => {

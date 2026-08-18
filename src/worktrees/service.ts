@@ -213,7 +213,7 @@ function parseRepositoryStatuses(statusCommandResult: Awaited<ReturnType<Command
   statusWarning?: string;
 } {
   const statusWarning =
-    "Workspace status dashboard could not read `arashi status --json`. Upgrade Arashi or check the Arashi output channel for diagnostics.";
+    "Workspace status dashboard could not read `aw status --json`. Upgrade Arashi or check the Arashi output channel for diagnostics.";
   if (!statusCommandResult.ok) {
     return { repositoryStatuses: [], statusWarning };
   }
