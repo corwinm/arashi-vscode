@@ -3,6 +3,7 @@
   "cliCommands": {
     "add": { "state": "mapped", "commands": ["arashi.add", "arashi.worktrees.addRepo"] },
     "clone": { "state": "mapped", "commands": ["arashi.clone", "arashi.worktrees.cloneMissing"] },
+    "configure": { "state": "excluded", "reason": "Configure is a terminal-owned interactive workflow with visible plaintext entry and exact serialized confirmation; the extension does not provide an equivalent editor surface." },
     "create": { "state": "mapped", "commands": ["arashi.create"] },
     "doctor": { "state": "excluded", "reason": "Doctor is a terminal-oriented diagnostic workflow whose detailed environment report is better consumed directly in a terminal." },
     "exec": { "state": "excluded", "reason": "Arbitrary command execution needs terminal semantics and trust controls that the extension does not currently provide." },

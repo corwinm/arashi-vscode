@@ -45,7 +45,7 @@ describe("VS Code command contract", () => {
   });
 
   test("policy classifies every known CLI command and references real extension surfaces", () => {
-    const knownCliCommands = ["add", "clone", "create", "doctor", "exec", "handoff", "init", "install", "list", "move", "prune", "pull", "push", "remove", "setup", "shell", "status", "switch", "sync", "update"];
+    const knownCliCommands = ["add", "clone", "configure", "create", "doctor", "exec", "handoff", "init", "install", "list", "move", "prune", "pull", "push", "remove", "setup", "shell", "status", "switch", "sync", "update"];
     const entries = policy.cliCommands as Record<string, PolicyEntry>;
     expect(sorted(Object.keys(entries))).toEqual(knownCliCommands);
 
