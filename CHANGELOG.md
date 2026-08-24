@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/corwinm/arashi-vscode/compare/v1.5.0...v1.5.1) (2026-08-24)
+
+### Bug Fixes
+
+* update js-yaml security patch ([#32](https://github.com/corwinm/arashi-vscode/issues/32)) ([fae6200](https://github.com/corwinm/arashi-vscode/commit/fae62008c4974feb7bd3afbd5216e371a8527115))
+
 ## [1.5.0](https://github.com/corwinm/arashi-vscode/compare/v1.4.0...v1.5.0) (2026-08-11)
 
 ### Features
