@@ -1,0 +1,37 @@
+name: Verify published extension release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Exact published version without v prefix
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact published version without v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-published:
+    name: Verify both extension registries
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        with:
+          version: 11.22.0
+          runtime: node@24.18.0
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Verify exact Marketplace and Open VSX versions
+        env:
+          VERIFY_VERSION: ${{ inputs.version }}
+        run: pnpm release:verify-published -- "$VERIFY_VERSION"

@@ -10,25 +10,29 @@ on:
         default: false
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
-    name: Release
+  dry-run:
+    if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run == 'true'
+    name: Release dry run
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository (full history)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Setup pnpm and Node.js
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
         with:
           version: 11.22.0
           runtime: node@24.18.0
@@ -38,9 +42,56 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify extension build and release metadata
+        run: |
+          pnpm run build
+          pnpm run verify:release
+
+      - name: Run credential-free semantic-release plan
+        run: |
+          git clone --bare . "$RUNNER_TEMP/release-plan.git"
+          node scripts/release-plan.mjs "file://$RUNNER_TEMP/release-plan.git"
+        env:
+          NODE_ENV: production
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      version: ${{ steps.published.outputs.version }}
+    steps:
+      - name: Checkout repository without release credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
+        with:
+          version: 11.22.0
+          runtime: node@24.18.0
+          cache: true
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure release deploy key
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          clean: false
+          fetch-depth: 0
+          persist-credentials: true
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+
       - name: Authenticate to Azure for VS Marketplace publishing
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        uses: azure/login@v3
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -51,14 +102,65 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Run semantic-release
-        run: |
-          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
-            pnpm exec semantic-release --dry-run
-          else
-            pnpm exec semantic-release
-          fi
+      - name: Snapshot existing release tags
+        run: git tag --list 'v*' --sort=refname > "$RUNNER_TEMP/release-tags-before"
+
+      - name: Run semantic-release publication
+        run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
           NODE_ENV: production
+
+      - name: Detect newly published version
+        id: published
+        shell: bash
+        run: |
+          git tag --list 'v*' --sort=refname > "$RUNNER_TEMP/release-tags-after"
+          mapfile -t new_tags < <(comm -13 "$RUNNER_TEMP/release-tags-before" "$RUNNER_TEMP/release-tags-after")
+          if [ "${#new_tags[@]}" -eq 0 ]; then
+            echo "No release was published."
+            exit 0
+          fi
+          if [ "${#new_tags[@]}" -ne 1 ]; then
+            printf 'Expected one new release tag, found: %s\n' "${new_tags[*]}" >&2
+            exit 1
+          fi
+          version="${new_tags[0]#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Unexpected release tag: ${new_tags[0]}" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  notify-related-work:
+    name: Comment on released PRs and issues
+    needs: release
+    if: needs.release.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout notification script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Comment on related work
+        run: node scripts/notify-published-release.mjs "$RELEASE_VERSION"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+
+  verify-published:
+    name: Verify published release
+    needs: release
+    if: needs.release.outputs.version != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/verify-published-release.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
