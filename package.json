@@ -260,6 +260,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
+    "pr-title:check": "node scripts/validate-pr-title.mts",
     "test:vscode": "pnpm run build && node scripts/run-vscode-integration-tests.mts",
     "vscode:prepublish": "pnpm run build",
     "verify:release": "node scripts/verify-release-metadata.mts",
