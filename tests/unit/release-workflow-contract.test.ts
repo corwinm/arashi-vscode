@@ -23,6 +23,9 @@ describe("release workflow contract", () => {
     expect(workflow).toContain("cancel-in-progress: false");
     expect(workflow).toContain("timeout-minutes:");
     expect(workflow).toContain("ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}");
+    expect(workflow).not.toMatch(/^\s*uses:\s+[^\s]+@v\d+/mu);
+    expect(workflow).not.toContain("pull-requests: write");
+    expect(workflow).not.toContain("issues: write");
   });
 
   test("withholds marketplace credentials from dry runs and verifies real publications", () => {
@@ -35,6 +38,12 @@ describe("release workflow contract", () => {
     expect(workflow).toContain("needs.release.outputs.version");
     expect(verification).toContain("workflow_call:");
     expect(verification).toContain("release:verify-published");
+    const dryRun = workflow.slice(
+      workflow.indexOf("Run semantic-release dry run"),
+      workflow.indexOf("Run semantic-release publication"),
+    );
+    expect(dryRun).not.toContain("OVSX_PAT");
+    expect(verification).not.toMatch(/^\s*-?\s*uses:\s+[^\s]+@v\d+/mu);
   });
 
   test("matches only an exact version in each registry response", () => {
