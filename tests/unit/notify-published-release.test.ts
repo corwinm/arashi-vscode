@@ -1,17 +1,25 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, test } from "vitest";
 import {
   extractClosingReferences,
-  notifyTarget,
+  isExactVersion,
   notificationMarker,
+  notifyTarget,
+  releaseCommits,
 } from "../../scripts/notify-published-release.mjs";
+import { readFileSync } from "node:fs";
 
 const missingRequest = async (): Promise<never> => {
   throw Object.assign(new Error("Not Found"), { status: 404 });
 };
 
 describe("published release notifications", () => {
+  test("rejects empty prerelease identifiers", () => {
+    for (const version of ["1.2.3-.", "1.2.3-foo.", "1.2.3-.."]) {
+      expect(isExactVersion(version)).toBe(false);
+    }
+    expect(isExactVersion("1.2.3-rc.1")).toBe(true);
+  });
+
   test("keeps semantic-release notification hooks out of the publish result", () => {
     const releaseConfig = JSON.parse(
       readFileSync(new URL("../../.releaserc.json", import.meta.url), "utf8"),
@@ -51,9 +59,16 @@ describe("published release notifications", () => {
   test("repairs a missing released label without duplicating the comment", async () => {
     const writes: string[] = [];
     const request = async (path: string, options?: { method?: string }) => {
-      if (options?.method === "POST") writes.push(path);
-      if (path.endsWith("/comments?per_page=100")) {
-        return [{ body: notificationMarker("1.5.2") }];
+      if (options?.method === "POST") {
+        writes.push(path);
+      }
+      if (path.includes("/comments?")) {
+        return [
+          {
+            body: notificationMarker("1.5.2"),
+            user: { login: "github-actions[bot]" },
+          },
+        ];
       }
       return {};
     };
@@ -69,5 +84,103 @@ describe("published release notifications", () => {
       }),
     ).resolves.toBe("existing");
     expect(writes).toEqual(["/repos/corwinm/arashi-vscode/issues/12/labels"]);
+  });
+
+  test("does not trust a release marker from another commenter", async () => {
+    const writes: string[] = [];
+    const request = async (path: string, options?: { method?: string }) => {
+      if (options?.method === "POST") {
+        writes.push(path);
+      }
+      if (path.includes("/comments?")) {
+        return [{ body: notificationMarker("1.5.2"), user: { login: "attacker" } }];
+      }
+      return {};
+    };
+
+    await notifyTarget({
+      number: 12,
+      owner: "corwinm",
+      releaseUrl: "https://github.com/corwinm/arashi-vscode/releases/tag/v1.5.2",
+      repo: "arashi-vscode",
+      request,
+      version: "1.5.2",
+    });
+
+    expect(writes).toEqual([
+      "/repos/corwinm/arashi-vscode/issues/12/comments",
+      "/repos/corwinm/arashi-vscode/issues/12/labels",
+    ]);
+  });
+
+  test("finds an authoritative marker on a later comment page", async () => {
+    const reads: string[] = [];
+    const writes: string[] = [];
+    const request = async (path: string, options?: { method?: string }) => {
+      if (options?.method === "POST") {
+        writes.push(path);
+      }
+      if (path.includes("/comments?")) {
+        reads.push(path);
+        if (path.endsWith("page=1")) {
+          return Array.from({ length: 100 }, () => ({ body: "old" }));
+        }
+        return [
+          {
+            body: notificationMarker("1.5.2"),
+            user: { login: "github-actions[bot]" },
+          },
+        ];
+      }
+      return {};
+    };
+
+    await notifyTarget({
+      number: 12,
+      owner: "corwinm",
+      releaseUrl: "https://github.com/corwinm/arashi-vscode/releases/tag/v1.5.2",
+      repo: "arashi-vscode",
+      request,
+      version: "1.5.2",
+    });
+
+    expect(reads).toEqual([
+      "/repos/corwinm/arashi-vscode/issues/12/comments?per_page=100&page=1",
+      "/repos/corwinm/arashi-vscode/issues/12/comments?per_page=100&page=2",
+    ]);
+    expect(writes).toEqual(["/repos/corwinm/arashi-vscode/issues/12/labels"]);
+  });
+
+  test("loads every comparison page", async () => {
+    const comparisonPaths: string[] = [];
+    const request = async (path: string) => {
+      if (path.endsWith("/releases?per_page=100")) {
+        return [
+          { html_url: "https://example.test/v1.5.2", tag_name: "v1.5.2" },
+          { draft: false, prerelease: false, tag_name: "v1.5.1" },
+        ];
+      }
+      comparisonPaths.push(path);
+      const page = path.endsWith("page=1") ? 1 : 2;
+      return {
+        commits: Array.from({ length: page === 1 ? 100 : 1 }, (_, index) => ({
+          sha: `${page}-${index}`,
+        })),
+        total_commits: 101,
+      };
+    };
+
+    const result = await releaseCommits({
+      currentTag: "v1.5.2",
+      owner: "corwinm",
+      repo: "arashi-vscode",
+      request,
+    });
+
+    expect(result.commits).toHaveLength(101);
+    expect(comparisonPaths).toEqual([
+      "/repos/corwinm/arashi-vscode/compare/v1.5.1...v1.5.2?per_page=100&page=1",
+      "/repos/corwinm/arashi-vscode/compare/v1.5.1...v1.5.2?per_page=100&page=2",
+    ]);
   });
 });
