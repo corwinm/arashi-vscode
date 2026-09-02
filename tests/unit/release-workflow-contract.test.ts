@@ -26,22 +26,33 @@ describe("release workflow contract", () => {
     expect(workflow).not.toMatch(/^\s*uses:\s+[^\s]+@v\d+/mu);
     expect(workflow).not.toContain("pull-requests: write");
     expect(workflow).not.toContain("issues: write");
+    const dryRunJob = workflow.slice(
+      workflow.indexOf("  dry-run:"),
+      workflow.indexOf("  release:"),
+    );
+    expect(dryRunJob).toContain("contents: read");
+    expect(dryRunJob).toContain("file://$RUNNER_TEMP/release-plan.git");
+    expect(dryRunJob).not.toContain("RELEASE_DEPLOY_KEY");
+    expect(dryRunJob).not.toContain("id-token: write");
+    expect(dryRunJob).not.toContain("GITHUB_TOKEN");
+    expect(dryRunJob).not.toContain("OVSX_PAT");
+    const publicationJob = workflow.slice(workflow.indexOf("  release:"));
+    expect(publicationJob).toContain("github.event.inputs.dry_run != 'true'");
+    expect(publicationJob).toContain("RELEASE_DEPLOY_KEY");
+    expect(publicationJob).toContain("id-token: write");
   });
 
   test("withholds marketplace credentials from dry runs and verifies real publications", () => {
     const workflow = read(".github/workflows/release.yml");
     const verification = read(".github/workflows/verify-published-release.yml");
 
-    expect(workflow).toContain("Run semantic-release dry run");
+    expect(workflow).toContain("Run credential-free semantic-release plan");
     expect(workflow).toContain("Run semantic-release publication");
     expect(workflow).toContain("uses: ./.github/workflows/verify-published-release.yml");
     expect(workflow).toContain("needs.release.outputs.version");
     expect(verification).toContain("workflow_call:");
     expect(verification).toContain("release:verify-published");
-    const dryRun = workflow.slice(
-      workflow.indexOf("Run semantic-release dry run"),
-      workflow.indexOf("Run semantic-release publication"),
-    );
+    const dryRun = workflow.slice(workflow.indexOf("  dry-run:"), workflow.indexOf("  release:"));
     expect(dryRun).not.toContain("OVSX_PAT");
     expect(verification).not.toMatch(/^\s*-?\s*uses:\s+[^\s]+@v\d+/mu);
   });
