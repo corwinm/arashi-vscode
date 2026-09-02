@@ -11,24 +11,30 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
-  issues: write
   id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     name: Release
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.published.outputs.version }}
     steps:
       - name: Checkout repository (full history)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: true
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Setup pnpm and Node.js
-        uses: pnpm/setup@v2
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2
         with:
           version: 11.22.0
           runtime: node@24.18.0
@@ -39,8 +45,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Authenticate to Azure for VS Marketplace publishing
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        uses: azure/login@v3
+        if: github.event.inputs.dry_run != 'true'
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -51,14 +57,53 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Run semantic-release
-        run: |
-          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
-            pnpm exec semantic-release --dry-run
-          else
-            pnpm exec semantic-release
-          fi
+      - name: Snapshot existing release tags
+        if: github.event.inputs.dry_run != 'true'
+        run: git tag --list 'v*' --sort=refname > "$RUNNER_TEMP/release-tags-before"
+
+      - name: Run semantic-release dry run
+        if: github.event.inputs.dry_run == 'true'
+        run: pnpm exec semantic-release --dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
+
+      - name: Run semantic-release publication
+        if: github.event.inputs.dry_run != 'true'
+        run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
           NODE_ENV: production
+
+      - name: Detect newly published version
+        id: published
+        if: github.event.inputs.dry_run != 'true'
+        shell: bash
+        run: |
+          git tag --list 'v*' --sort=refname > "$RUNNER_TEMP/release-tags-after"
+          mapfile -t new_tags < <(comm -13 "$RUNNER_TEMP/release-tags-before" "$RUNNER_TEMP/release-tags-after")
+          if [ "${#new_tags[@]}" -eq 0 ]; then
+            echo "No release was published."
+            exit 0
+          fi
+          if [ "${#new_tags[@]}" -ne 1 ]; then
+            printf 'Expected one new release tag, found: %s\n' "${new_tags[*]}" >&2
+            exit 1
+          fi
+          version="${new_tags[0]#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Unexpected release tag: ${new_tags[0]}" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  verify-published:
+    name: Verify published release
+    needs: release
+    if: needs.release.outputs.version != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/verify-published-release.yml
+    with:
+      version: ${{ needs.release.outputs.version }}

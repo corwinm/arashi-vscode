@@ -264,6 +264,7 @@
     "test:vscode": "pnpm run build && node scripts/run-vscode-integration-tests.mts",
     "vscode:prepublish": "pnpm run build",
     "verify:release": "node scripts/verify-release-metadata.mts",
+    "release:verify-published": "node scripts/verify-published-release.mts",
     "release": "semantic-release",
     "package": "pnpm exec vsce package",
     "publish:vsce": "pnpm exec vsce publish --azure-credential",
