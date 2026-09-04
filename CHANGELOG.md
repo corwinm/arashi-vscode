@@ -1,3 +1,9 @@
+## [1.5.2](https://github.com/corwinm/arashi-vscode/compare/v1.5.1...v1.5.2) (2026-09-04)
+
+### Bug Fixes
+
+* **deps:** patch vulnerable transitive packages ([#42](https://github.com/corwinm/arashi-vscode/issues/42)) ([5b6d0a4](https://github.com/corwinm/arashi-vscode/commit/5b6d0a48c1aea4b3d5da0e1152bb10f26f87c97e))
+
 ## [1.5.1](https://github.com/corwinm/arashi-vscode/compare/v1.5.0...v1.5.1) (2026-08-24)
 
 ### Bug Fixes
