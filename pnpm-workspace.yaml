@@ -8,6 +8,7 @@ overrides:
   'postcss>nanoid': 3.3.18
   'rc-config-loader>js-yaml': 4.3.2
   'typed-rest-client>qs': 6.16.0
+  'ovsx>follow-redirects': 1.16.1
 
 allowBuilds:
   '@vscode/vsce-sign': false
